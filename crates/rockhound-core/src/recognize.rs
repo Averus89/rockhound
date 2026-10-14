@@ -11,7 +11,7 @@ use std::path::Path;
 
 use image::{imageops, GrayImage};
 
-use crate::layout::TextLine;
+use crate::layout::Rect;
 use crate::preprocess::otsu;
 
 /// Lines are scaled to this height before learning or matching.
@@ -96,7 +96,7 @@ fn unit_vector(values: impl Iterator<Item = f32>) -> Vec<f32> {
 
 /// Crop the text line out of a normalized image and scale it to
 /// [`LINE_HEIGHT`].
-pub fn line_image(gray: &GrayImage, line: &TextLine) -> GrayImage {
+pub fn line_image(gray: &GrayImage, line: &Rect) -> GrayImage {
     let crop = imageops::crop_imm(gray, line.x, line.y, line.width, line.height).to_image();
     let width = (line.width * LINE_HEIGHT).div_ceil(line.height).max(1);
     imageops::resize(&crop, width, LINE_HEIGHT, imageops::FilterType::Triangle)

@@ -8,9 +8,9 @@ use image::{GrayImage, RgbaImage};
 
 use crate::preprocess::otsu;
 
-/// Bounding box of the digit line in crop pixels.
+/// Axis-aligned rectangle in image pixels.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct TextLine {
+pub struct Rect {
     pub x: u32,
     pub y: u32,
     pub width: u32,
@@ -27,7 +27,7 @@ const MIN_LINE_HEIGHT: u32 = 5;
 
 /// Locate the digit line. `rgba` is the raw crop (for colour), `gray` its
 /// normalized version from [`crate::preprocess::normalize`].
-pub fn find_line(rgba: &RgbaImage, gray: &GrayImage) -> Option<TextLine> {
+pub fn find_line(rgba: &RgbaImage, gray: &GrayImage) -> Option<Rect> {
     let threshold = otsu(gray);
     let ink = |x: u32, y: u32| gray.get_pixel(x, y).0[0] > threshold;
     let (w, h) = gray.dimensions();
@@ -77,7 +77,7 @@ pub fn find_line(rgba: &RgbaImage, gray: &GrayImage) -> Option<TextLine> {
         .filter(|&x| (y0..y1).any(|y| ink(x, y)))
         .collect();
     let (&x0, &x1) = (cols.first()?, cols.last()?);
-    Some(TextLine {
+    Some(Rect {
         x: x0,
         y: y0,
         width: x1 - x0 + 1,

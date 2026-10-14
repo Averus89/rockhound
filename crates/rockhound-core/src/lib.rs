@@ -7,6 +7,7 @@
 //! [`signatures`] table, and vote over recent frames).
 
 pub mod layout;
+pub mod locate;
 pub mod preprocess;
 pub mod recognize;
 pub mod resolve;
