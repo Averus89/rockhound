@@ -1,5 +1,16 @@
 # Devlog
 
+## 2026-10-14: v0.4.1, look and feel
+
+- Theme: "ember" accent taken from the in-game pin orange, a dark blue-grey
+  gradient background, translucent panels. Inter and JetBrains Mono are
+  bundled (fontsource), so the look doesn't depend on installed fonts.
+- Main window: pin logo, Scanning/Idle status pill, icon buttons, a large
+  glowing value with a tier-coloured edge, category icon, and a history
+  panel with tier dots.
+- Overlay: glass card with a tier-coloured edge; each new value fades in.
+- Animations are skipped when Windows asks for reduced motion.
+
 ## 2026-10-14: v0.4.0, overlay
 
 - Second window `overlay`: transparent, undecorated, always on top, no

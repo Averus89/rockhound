@@ -1,6 +1,9 @@
-import type { Category } from "./api";
+import type { Category, SignatureMatch } from "./api";
 
 export const formatSignature = (value: number) => value.toLocaleString("en-US");
+
+/** "Copper ×3", or just "Copper" for a single object. */
+export const matchLabel = (m: SignatureMatch) => (m.count > 1 ? `${m.name} ×${m.count}` : m.name);
 
 export const CATEGORY_LABEL: Record<Category, string> = {
   ship_mining: "Ship mining",
@@ -16,3 +19,7 @@ export const TIER_COLOR: Record<string, string> = {
   uncommon: "teal",
   common: "gray",
 };
+
+/** Mantine colour for a match's tier; untiered sources use the accent. */
+export const tierColor = (m: SignatureMatch | undefined) =>
+  (m?.tier && TIER_COLOR[m.tier]) || "ember";
