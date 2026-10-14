@@ -142,3 +142,59 @@ fn to_reading(
         at,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::mpsc;
+
+    use rockhound_core::{learn_crop, TemplateSet};
+
+    use super::*;
+
+    const CROP: &str = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../crates/rockhound-core/tests/fixtures/hud_17200_pin.png"
+    );
+
+    /// Serves the same real crop a few times, then fails.
+    struct Frames(usize);
+
+    impl FrameSource for Frames {
+        fn next_crop(&mut self) -> Result<Option<RgbaImage>, String> {
+            if self.0 == 0 {
+                return Err("out of frames".into());
+            }
+            self.0 -= 1;
+            Ok(Some(image::open(CROP).unwrap().to_rgba8()))
+        }
+    }
+
+    #[test]
+    fn reports_the_voted_value_once_and_the_stop_reason() {
+        let db = SignatureDb::from_json(include_str!("../../../data/signatures.json")).unwrap();
+        let mut templates = TemplateSet::default();
+        learn_crop(
+            &image::open(CROP).unwrap().to_rgba8(),
+            17200,
+            &mut templates,
+        );
+        let (readings, got_readings) = mpsc::channel();
+        let (stopped, got_stop) = mpsc::channel();
+        let handle = spawn(
+            Box::new(Frames(3)),
+            Reader::new(templates, None, None),
+            Arc::new(RwLock::new(db)),
+            Duration::from_millis(1),
+            move |r| readings.send(r).unwrap(),
+            move |e| stopped.send(e).unwrap(),
+        );
+        let stop_reason = got_stop.recv_timeout(Duration::from_secs(5)).unwrap();
+        handle.stop();
+        assert_eq!(stop_reason.as_deref(), Some("out of frames"));
+        let shown: Vec<_> = got_readings.try_iter().collect();
+        assert_eq!(shown.len(), 1, "only the change is reported");
+        assert_eq!(shown[0].value, Some(17200));
+        assert_eq!(shown[0].raw, "17,200");
+        assert!(!shown[0].matches.is_empty());
+    }
+}

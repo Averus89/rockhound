@@ -1,5 +1,18 @@
 # Devlog
 
+## 2026-10-14: v0.3.1, CI quality gates
+
+- Coverage gate: `cargo llvm-cov` runs the test suite and fails under 85%
+  line coverage (91.7% now). Tauri command glue (`src-tauri/src/lib.rs`) and
+  the entry points are excluded since they only wire tested code together.
+- Scan loop test: real crop in, one voted reading out, stop reason reported.
+- Frontend tests with Vitest + Testing Library (jsdom): value formatting and
+  the readout card states. `npm test` runs in CI after the build.
+- Security: new `audit` job runs `cargo audit` (fails on vulnerabilities,
+  unmaintained notices only warn) and `npm audit --audit-level=high`.
+  Dependabot opens weekly update PRs for cargo, npm and Actions.
+- CodeQL is not set up: it needs GitHub Advanced Security on a private repo.
+
 ## 2026-10-14: v0.3.0, live capture and a reader that handles the real HUD
 
 The first real 1440p crop ("17,200") broke the old segmenter: HUD digits are
