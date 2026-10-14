@@ -37,20 +37,24 @@ pub fn find_readout(band: &RgbaImage) -> Option<Rect> {
 }
 
 fn readout_beside(band: &RgbaImage, pin: &Rect) -> Option<Rect> {
+    // The digits sit inside the pin's vertical span, to its right. Keeping
+    // the search that tight leaves out asteroids and other bright HUD text.
     let h = pin.height;
-    let y0 = (pin.y + h / 2).saturating_sub(h * 3 / 2);
+    let x0 = pin.x + pin.width;
     let area = Rect {
-        x: pin.x,
-        y: y0,
-        width: (pin.width + h * SEARCH_WIDTH_PER_PIN_HEIGHT).min(band.width() - pin.x),
-        height: (h * 3).min(band.height() - y0),
+        x: x0,
+        y: pin.y,
+        width: (h * SEARCH_WIDTH_PER_PIN_HEIGHT).min(band.width() - x0),
+        height: h,
     };
+    if area.width == 0 {
+        return None;
+    }
     let crop = imageops::crop_imm(band, area.x, area.y, area.width, area.height).to_image();
     let line = find_line(&crop, &normalize(&crop))?;
-    // Digits are shorter than the pin and start right of it; anything else
-    // is other HUD text or the pin's own outline.
-    let right_of_pin = area.x + line.x >= pin.x + pin.width;
-    if !right_of_pin || line.height * 4 < h || line.height > h {
+    // Digits are clearly shorter than the pin; a full-height blob is
+    // something else.
+    if line.height * 4 < h || line.height >= h {
         return None;
     }
     let pad = line.height / 2;

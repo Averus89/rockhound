@@ -43,7 +43,9 @@ split on, and the 3x upscale smeared what gaps there were.
   blanking and the segmenter are gone.
 - `locate` finds the readout on screen from the orange pin (blob of pin
   colour, then a text line to its right). ~4 ms on a 2048x720 band, so it
-  runs every frame and follows the pin as the ship turns.
+  runs every frame and follows the pin as the ship turns. Only the pin's
+  own height is searched, to its right: a taller search picked up an
+  asteroid in Alan's 5120x1440 screenshot.
 - Live capture (Windows): Windows Graphics Capture of the `StarCitizen.exe`
   window, copying only the middle band (30-70% wide, 15-65% high) off the
   GPU. A fixed box from Settings overrides the locator.
