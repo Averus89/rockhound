@@ -42,10 +42,17 @@ jobs:
           cache: npm
           cache-dependency-path: app/package-lock.json
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
       - uses: Swatinem/rust-cache@v2
-      - name: Install frontend dependencies
+      - name: Build frontend
         working-directory: app
-        run: npm ci
+        run: |
+          npm ci
+          npm run build
+      # Windows-only code (game capture, OCR) is only compiled here.
+      - run: cargo clippy -p rockhound-app --all-targets -- -D warnings
+      - run: cargo test -p rockhound-app
       # Builds the frontend, the release exe and the NSIS installer.
       - name: Build app
         working-directory: app

@@ -1,5 +1,36 @@
 # Devlog
 
+## 2026-10-14: v0.3.0, live capture and a reader that handles the real HUD
+
+The first real 1440p crop ("17,200") broke the old segmenter: HUD digits are
+~11 px tall, bold, and touch each other, so there are no blank columns to
+split on, and the 3x upscale smeared what gaps there were.
+
+- Recognition rewritten. `layout` finds the digit line (column clusters,
+  dropping saturated ones, i.e. the pin, and rejoining pieces split by a
+  comma). `recognize` scales the line to 24 px and a dynamic program picks
+  the template sequence that best explains it. Templates are learned from a
+  line plus its known text ("17,200"), trimmed to their ink. Pin-colour
+  blanking and the segmenter are gone.
+- `locate` finds the readout on screen from the orange pin (blob of pin
+  colour, then a text line to its right). ~4 ms on a 2048x720 band, so it
+  runs every frame and follows the pin as the ship turns.
+- Live capture (Windows): Windows Graphics Capture of the `StarCitizen.exe`
+  window, copying only the middle band (30-70% wide, 15-65% high) off the
+  GPU. A fixed box from Settings overrides the locator.
+- Windows OCR teaches templates: when templates can't read a frame (or
+  digits are still missing), OCR reads it at most once a second. A value the
+  signature table explains is shown, and once OCR reads it twice in a row it
+  is learned and saved to the templates folder. A fresh install therefore
+  starts on OCR and moves to templates by itself.
+- Settings: "Find the readout automatically" switch (default on).
+- Real HUD crops are test fixtures (`crates/rockhound-core/tests/fixtures`):
+  learn from one frame, locate and read the other with the pin in view.
+- CI runs clippy and the app tests on Windows too, since capture and OCR
+  only compile there.
+
+Not verified on a real game session yet (no Windows machine here).
+
 ## 2026-10-14: v0.2.0, Tauri shell
 
 Added `app/`: Tauri v2 backend plus a React + Mantine UI (dark, orange accent).

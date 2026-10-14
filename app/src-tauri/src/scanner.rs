@@ -7,12 +7,15 @@ use std::thread::JoinHandle;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use image::RgbaImage;
-use rockhound_core::{read_crop, SignatureDb, SignatureMatch, TemplateSet, Voter};
+use rockhound_core::{SignatureDb, SignatureMatch, Voter};
 use serde::Serialize;
+
+use crate::reader::Reader;
 
 /// Where readout crops come from.
 pub trait FrameSource: Send {
-    /// The next crop of the readout, or `None` when no frame is available.
+    /// The next crop of the readout, or `None` when the readout isn't on
+    /// screen (which clears the shown value once the vote agrees).
     fn next_crop(&mut self) -> Result<Option<RgbaImage>, String>;
 }
 
@@ -83,7 +86,7 @@ impl ScannerHandle {
 /// the voted value; `on_stop` gets the error that ended the loop, if any.
 pub fn spawn(
     mut source: Box<dyn FrameSource>,
-    templates: TemplateSet,
+    mut reader: Reader,
     db: Arc<RwLock<SignatureDb>>,
     interval: Duration,
     on_reading: impl Fn(Reading) + Send + 'static,
@@ -97,9 +100,9 @@ pub fn spawn(
         let mut error = None;
         while !stop_flag.load(Ordering::Relaxed) {
             match source.next_crop() {
-                Ok(Some(crop)) => {
+                Ok(crop) => {
                     let db = db.read().unwrap_or_else(|e| e.into_inner());
-                    let resolved = read_crop(&crop, &templates, &db);
+                    let resolved = crop.and_then(|c| reader.read(&c, &db));
                     let value = voter.push(resolved.as_ref().and_then(|r| r.value));
                     if value != shown {
                         shown = value;
@@ -107,7 +110,6 @@ pub fn spawn(
                         on_reading(to_reading(value, matches, resolved));
                     }
                 }
-                Ok(None) => {}
                 Err(e) => {
                     error = Some(e);
                     break;
