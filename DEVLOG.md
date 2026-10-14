@@ -1,5 +1,21 @@
 # Devlog
 
+## 2026-10-14: v0.4.0, overlay
+
+- Second window `overlay`: transparent, undecorated, always on top, no
+  taskbar entry, click-through. It loads the same frontend, which renders a
+  compact card (value, best match, tier) when its window label is
+  `overlay`, and nothing while there is no value.
+- Settings: "Show overlay over the game" (off by default). Saving settings
+  shows or hides it; it is restored at startup.
+- Placed top-centre of the primary monitor, 8% down. Closing the main
+  window exits the app so the hidden overlay can't keep it running.
+- On Linux the overlay must be shown before it can be made click-through
+  (tao panics otherwise), so it is shown first, then placed.
+
+Verified under Xvfb with a replay of the real "17,200" crop: main window
+and overlay both showed 17,200 as Ice x4.
+
 ## 2026-10-14: v0.3.1, CI quality gates
 
 - Coverage gate: `cargo llvm-cov` runs the test suite and fails under 85%

@@ -23,6 +23,7 @@ export interface Reading {
 export interface Settings {
   region: [number, number, number, number] | null;
   intervalMs: number;
+  overlay: boolean;
 }
 
 export interface Status {

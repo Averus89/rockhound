@@ -8,6 +8,7 @@
 mod capture;
 #[cfg(windows)]
 mod ocr;
+mod overlay;
 mod reader;
 mod scanner;
 mod settings;
@@ -21,7 +22,7 @@ use std::time::Duration;
 use rockhound_core::recognize::TemplateError;
 use rockhound_core::{SignatureDb, TemplateSet};
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
 
 use crate::reader::{Reader, Teacher};
 use crate::scanner::{ReplaySource, ScannerHandle};
@@ -72,8 +73,13 @@ fn get_status(state: State<'_, AppState>) -> Status {
 }
 
 #[tauri::command]
-fn save_settings(state: State<'_, AppState>, settings: Settings) -> Result<(), String> {
+fn save_settings(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    settings: Settings,
+) -> Result<(), String> {
     settings.save(&state.paths.settings)?;
+    overlay::set_visible(&app, settings.overlay)?;
     *lock(&state.settings) = settings;
     Ok(())
 }
@@ -187,6 +193,12 @@ pub fn run() {
             };
             let db = sync::load_local(&paths.signature_cache);
             let settings = Settings::load(&paths.settings);
+            if settings.overlay {
+                // A missing overlay shouldn't stop the main window opening.
+                if let Err(e) = overlay::set_visible(app.handle(), true) {
+                    eprintln!("{e}");
+                }
+            }
             app.manage(AppState {
                 paths,
                 db: Arc::new(RwLock::new(db)),
@@ -195,6 +207,13 @@ pub fn run() {
             });
             spawn_sync(app.handle().clone());
             Ok(())
+        })
+        .on_window_event(|window, event| {
+            // The hidden overlay would otherwise keep the app running after
+            // the main window is closed.
+            if window.label() == "main" && matches!(event, WindowEvent::CloseRequested { .. }) {
+                window.app_handle().exit(0);
+            }
         })
         .invoke_handler(tauri::generate_handler![
             get_status,
