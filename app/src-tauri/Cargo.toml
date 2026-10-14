@@ -1,0 +1,23 @@
+[package]
+name = "rockhound-app"
+description = "Rockhound desktop app"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[lib]
+name = "rockhound_app"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+image.workspace = true
+rockhound-core = { path = "../../crates/rockhound-core" }
+serde.workspace = true
+serde_json.workspace = true
+tauri = { version = "2", features = [] }
+ureq = "3"

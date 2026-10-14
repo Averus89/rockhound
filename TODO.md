@@ -12,8 +12,10 @@
 - [ ] Timed pipeline loop
 
 ## Milestone 3: Tauri shell
-- [ ] Tauri v2 + React + Mantine main window (simplified UI)
-- [ ] Signature table sync (fetch, validate, cache, bundled fallback)
+- [x] Tauri v2 + React + Mantine main window (simplified UI)
+- [x] Signature table sync (fetch, validate, cache, bundled fallback)
+- [ ] Sync only works once the repo (or the data file) is publicly readable
+- [ ] Ship templates with the app instead of the app data folder
 
 ## Milestone 4: overlay
 ## Milestone 5: packaging + release workflow
