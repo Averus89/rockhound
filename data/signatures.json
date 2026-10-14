@@ -1,0 +1,231 @@
+{
+  "schema": 1,
+  "data_version": "2026.03.18",
+  "sc_version": "4.7",
+  "sources": [
+    {
+      "name": "Quantainium",
+      "category": "ship_mining",
+      "tier": "legendary",
+      "base": 3170,
+      "max_count": 100
+    },
+    {
+      "name": "Stileron",
+      "category": "ship_mining",
+      "tier": "legendary",
+      "base": 3185,
+      "max_count": 100
+    },
+    {
+      "name": "Savrilium",
+      "category": "ship_mining",
+      "tier": "legendary",
+      "base": 3200,
+      "max_count": 100
+    },
+    {
+      "name": "Ouratite",
+      "category": "ship_mining",
+      "tier": "epic",
+      "base": 3370,
+      "max_count": 100
+    },
+    {
+      "name": "Riccite",
+      "category": "ship_mining",
+      "tier": "epic",
+      "base": 3385,
+      "max_count": 100
+    },
+    {
+      "name": "Lindinium",
+      "category": "ship_mining",
+      "tier": "epic",
+      "base": 3400,
+      "max_count": 100
+    },
+    {
+      "name": "Beryl",
+      "category": "ship_mining",
+      "tier": "rare",
+      "base": 3540,
+      "max_count": 100
+    },
+    {
+      "name": "Taranite",
+      "category": "ship_mining",
+      "tier": "rare",
+      "base": 3555,
+      "max_count": 100
+    },
+    {
+      "name": "Borase",
+      "category": "ship_mining",
+      "tier": "rare",
+      "base": 3570,
+      "max_count": 100
+    },
+    {
+      "name": "Gold",
+      "category": "ship_mining",
+      "tier": "rare",
+      "base": 3585,
+      "max_count": 100
+    },
+    {
+      "name": "Bexalite",
+      "category": "ship_mining",
+      "tier": "rare",
+      "base": 3600,
+      "max_count": 100
+    },
+    {
+      "name": "Laranite",
+      "category": "ship_mining",
+      "tier": "uncommon",
+      "base": 3825,
+      "max_count": 100
+    },
+    {
+      "name": "Aslarite",
+      "category": "ship_mining",
+      "tier": "uncommon",
+      "base": 3840,
+      "max_count": 100
+    },
+    {
+      "name": "Titanium",
+      "category": "ship_mining",
+      "tier": "uncommon",
+      "base": 3855,
+      "max_count": 100
+    },
+    {
+      "name": "Tungsten",
+      "category": "ship_mining",
+      "tier": "uncommon",
+      "base": 3870,
+      "max_count": 100
+    },
+    {
+      "name": "Agricium",
+      "category": "ship_mining",
+      "tier": "uncommon",
+      "base": 3885,
+      "max_count": 100
+    },
+    {
+      "name": "Torite",
+      "category": "ship_mining",
+      "tier": "uncommon",
+      "base": 3900,
+      "max_count": 100
+    },
+    {
+      "name": "Hephaestanite",
+      "category": "ship_mining",
+      "tier": "common",
+      "base": 4180,
+      "max_count": 100
+    },
+    {
+      "name": "Tin",
+      "category": "ship_mining",
+      "tier": "common",
+      "base": 4195,
+      "max_count": 100
+    },
+    {
+      "name": "Quartz",
+      "category": "ship_mining",
+      "tier": "common",
+      "base": 4210,
+      "max_count": 100
+    },
+    {
+      "name": "Corundum",
+      "category": "ship_mining",
+      "tier": "common",
+      "base": 4225,
+      "max_count": 100
+    },
+    {
+      "name": "Copper",
+      "category": "ship_mining",
+      "tier": "common",
+      "base": 4240,
+      "max_count": 100
+    },
+    {
+      "name": "Silicon",
+      "category": "ship_mining",
+      "tier": "common",
+      "base": 4255,
+      "max_count": 100
+    },
+    {
+      "name": "Iron",
+      "category": "ship_mining",
+      "tier": "common",
+      "base": 4270,
+      "max_count": 100
+    },
+    {
+      "name": "Aluminum",
+      "category": "ship_mining",
+      "tier": "common",
+      "base": 4285,
+      "max_count": 100
+    },
+    {
+      "name": "Ice",
+      "category": "ship_mining",
+      "tier": "common",
+      "base": 4300,
+      "max_count": 100
+    },
+    {
+      "name": "Small Ground Deposit",
+      "category": "ground_deposit",
+      "base": 3000,
+      "max_count": 50
+    },
+    {
+      "name": "Large Ground Deposit",
+      "category": "ground_deposit",
+      "base": 4000,
+      "max_count": 30
+    },
+    {
+      "name": "Salvage Panels",
+      "category": "salvage",
+      "base": 2000,
+      "max_count": 100
+    },
+    {
+      "name": "Small Wreck Debris",
+      "category": "salvage",
+      "base": 1700,
+      "max_count": 20
+    },
+    {
+      "name": "Medium Wreck Debris",
+      "category": "salvage",
+      "base": 1850,
+      "max_count": 20
+    },
+    {
+      "name": "Large Wreck Debris",
+      "category": "salvage",
+      "base": 2400,
+      "max_count": 20
+    },
+    {
+      "name": "Capital Wreck Debris",
+      "category": "salvage",
+      "base": 3000,
+      "max_count": 20
+    }
+  ]
+}

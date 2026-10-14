@@ -1,0 +1,7 @@
+/target
+node_modules/
+dist/
+# Reference videos and extracted frames stay out of git (too large).
+*.mp4
+*.mkv
+/replay/

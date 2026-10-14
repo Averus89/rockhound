@@ -1,0 +1,19 @@
+[workspace]
+resolver = "2"
+members = ["crates/rockhound-core", "crates/rockhound-replay"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.87"
+license = "MIT"
+authors = ["Alan (Averus89)"]
+repository = "https://github.com/Averus89/rockhound"
+
+[workspace.dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+image = { version = "0.25", default-features = false, features = ["png"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
