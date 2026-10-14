@@ -35,3 +35,19 @@ fn locates_the_readout_in_a_wider_screen_band() {
         Some(17200)
     );
 }
+
+#[test]
+fn locates_the_readout_among_asteroids_in_a_real_screenshot() {
+    // 600x240 slice of a 5120x1440 screenshot, with rocks above and beside
+    // the readout.
+    let band = fixture("hud_band_17200.png");
+    let r = locate::find_readout(&band).expect("readout found");
+
+    let mut templates = TemplateSet::default();
+    learn_crop(&fixture("hud_17200.png"), 17200, &mut templates);
+    let region = image::imageops::crop_imm(&band, r.x, r.y, r.width, r.height).to_image();
+    assert_eq!(
+        read_crop(&region, &templates, &db()).unwrap().value,
+        Some(17200)
+    );
+}
