@@ -82,7 +82,8 @@ fn start_scan(app: AppHandle, state: State<'_, AppState>) -> Result<(), String> 
         None => return Err("Live game capture arrives in the next update.".into()),
     };
     let templates = TemplateSet::load_dir(&state.paths.templates).map_err(|e| e.to_string())?;
-    let interval = Duration::from_millis(lock(&state.settings).interval_ms);
+    // A hand-edited settings file could hold 0, which would spin a core.
+    let interval = Duration::from_millis(lock(&state.settings).interval_ms.clamp(50, 2000));
     let (reading_app, stop_app) = (app.clone(), app);
     *slot = Some(scanner::spawn(
         source,

@@ -19,8 +19,9 @@ Early. What exists now:
   match and recent reads; settings for the readout box and read interval.
   Live game capture is the next milestone.
 - `data/signatures.json`: signature table (SC 4.7). The app checks this repo
-  for a newer copy at startup, caches it, and falls back to the bundled one,
-  so a patch only needs a data commit.
+  for a newer copy at startup, caches it, and falls back to the bundled one.
+  Once the file is publicly readable, a patch only needs a data commit; while
+  the repo is private, installed apps keep their bundled table.
 
 ## Running the app
 

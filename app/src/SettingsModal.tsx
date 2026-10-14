@@ -15,7 +15,10 @@ interface Props {
 export function SettingsModal({ opened, settings, onClose, onSave }: Props) {
   const [draft, setDraft] = useState(settings);
   const [error, setError] = useState<string | null>(null);
-  useEffect(() => setDraft(settings), [settings, opened]);
+  useEffect(() => {
+    setDraft(settings);
+    setError(null);
+  }, [settings, opened]);
 
   const region = draft.region ?? [0, 0, 0, 0];
   const setRegion = (i: number, v: number) => {
