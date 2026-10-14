@@ -23,6 +23,11 @@ Early. What exists now:
   Once the file is publicly readable, a patch only needs a data commit; while
   the repo is private, installed apps keep their bundled table.
 
+## Windows build
+
+Every CI run builds `rockhound-app.exe` and an NSIS installer. Download them
+from the run's **Artifacts** (`rockhound-windows`) on the Actions tab.
+
 ## Running the app
 
 Needs Rust, Node 22 and, on Linux, the WebKitGTK dev packages.

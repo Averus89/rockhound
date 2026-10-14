@@ -17,6 +17,8 @@ Added `app/`: Tauri v2 backend plus a React + Mantine UI (dark, orange accent).
   (`data_version` dates compared as strings). Offline or a bad file keeps the
   local table. While the repo is private the fetch returns 404 and is ignored.
 - CI builds the frontend and installs WebKitGTK so the app crate is checked.
+- CI `windows-build` job builds the release exe and NSIS installer and uploads
+  them as the `rockhound-windows` artifact.
 
 Verified: app built and run under Xvfb against the synthetic replay clip;
 clicking Start showed 12,720 as Copper x3.
