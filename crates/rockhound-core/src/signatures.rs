@@ -17,6 +17,8 @@ pub enum SignatureDbError {
     Schema { found: u32 },
     #[error("signature source {0:?} has a zero base or max_count")]
     InvalidSource(String),
+    #[error("data_version {0:?} is not a YYYY.MM.DD date")]
+    DataVersion(String),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -64,6 +66,11 @@ impl SignatureDb {
         if db.schema != SCHEMA_VERSION {
             return Err(SignatureDbError::Schema { found: db.schema });
         }
+        // Sync compares versions as strings, which is only time order for
+        // this exact format; a typo like "9999.x" would block later updates.
+        if !is_date_version(&db.data_version) {
+            return Err(SignatureDbError::DataVersion(db.data_version));
+        }
         if let Some(bad) = db.sources.iter().find(|s| s.base == 0 || s.max_count == 0) {
             return Err(SignatureDbError::InvalidSource(bad.name.clone()));
         }
@@ -98,6 +105,15 @@ impl SignatureDb {
     }
 }
 
+fn is_date_version(v: &str) -> bool {
+    let parts: Vec<&str> = v.split('.').collect();
+    let well_formed = matches!(parts.as_slice(), [y, m, d] if y.len() == 4 && m.len() == 2 && d.len() == 2)
+        && parts.iter().all(|p| p.bytes().all(|b| b.is_ascii_digit()));
+    well_formed
+        && (1..=12).contains(&parts[1].parse::<u32>().unwrap_or(0))
+        && (1..=31).contains(&parts[2].parse::<u32>().unwrap_or(0))
+}
+
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
@@ -105,7 +121,7 @@ pub(crate) mod tests {
     pub(crate) fn sample_db() -> SignatureDb {
         SignatureDb::from_json(
             r#"{
-                "schema": 1, "data_version": "test", "sc_version": "4.7",
+                "schema": 1, "data_version": "2026.01.01", "sc_version": "4.7",
                 "sources": [
                     {"name": "Laranite", "category": "ship_mining", "tier": "uncommon", "base": 3825, "max_count": 100},
                     {"name": "Riccite", "category": "ship_mining", "tier": "epic", "base": 3385, "max_count": 100},
@@ -141,6 +157,22 @@ pub(crate) mod tests {
             SignatureDb::from_json(json),
             Err(SignatureDbError::Schema { found: 99 })
         ));
+    }
+
+    #[test]
+    fn rejects_malformed_data_version() {
+        for bad in ["9999.bad", "2026.13.01", "2026.3.18", "2026.03.18.1"] {
+            let json = format!(
+                r#"{{"schema": 1, "data_version": "{bad}", "sc_version": "x", "sources": []}}"#
+            );
+            assert!(
+                matches!(
+                    SignatureDb::from_json(&json),
+                    Err(SignatureDbError::DataVersion(_))
+                ),
+                "{bad}"
+            );
+        }
     }
 
     #[test]
