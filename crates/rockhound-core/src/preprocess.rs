@@ -1,49 +1,24 @@
 //! Crop -> clean grayscale image with bright text on a dark background.
 
-use image::{imageops, GrayImage, Luma, RgbaImage};
-
-/// Upscale factor applied before segmentation. The HUD digits are ~13 px tall
-/// at 1440p; at native size neighbouring glyphs touch after thresholding.
-pub const UPSCALE: u32 = 3;
+use image::{imageops, GrayImage, RgbaImage};
 
 /// Percentiles used for the contrast stretch, so a few hot pixels (stars,
 /// rock highlights) don't flatten the range.
 const STRETCH_LOW: f32 = 0.01;
 const STRETCH_HIGH: f32 = 0.99;
 
-/// Convert an RGBA crop into a contrast-stretched, upscaled grayscale image
-/// where text is bright.
+/// Convert an RGBA crop into a contrast-stretched grayscale image where text
+/// is bright.
 pub fn normalize(crop: &RgbaImage) -> GrayImage {
-    let gray = to_gray_without_pin(crop);
-    let (w, h) = gray.dimensions();
-    let mut big = imageops::resize(
-        &gray,
-        w * UPSCALE,
-        h * UPSCALE,
-        imageops::FilterType::Triangle,
-    );
-    stretch(&mut big);
-    let threshold = otsu(&big);
-    if bright_fraction(&big, threshold) > 0.5 {
+    let mut gray = imageops::grayscale(crop);
+    stretch(&mut gray);
+    let threshold = otsu(&gray);
+    if bright_fraction(&gray, threshold) > 0.5 {
         // Text is always the minority of the crop; if most pixels are
         // "bright", we're looking at dark-ish text over a bright rock.
-        imageops::invert(&mut big);
+        imageops::invert(&mut gray);
     }
-    big
-}
-
-/// Grayscale conversion that blanks the orange map-pin icon. It sits just
-/// left of the number and was read as a digit by the old scanner.
-fn to_gray_without_pin(crop: &RgbaImage) -> GrayImage {
-    GrayImage::from_fn(crop.width(), crop.height(), |x, y| {
-        let [r, g, b, _] = crop.get_pixel(x, y).0;
-        let (r, g, b) = (i32::from(r), i32::from(g), i32::from(b));
-        if r > 150 && r - b > 80 && r > g {
-            return Luma([0]);
-        }
-        // ITU-R BT.601 luma, integer form.
-        Luma([((299 * r + 587 * g + 114 * b) / 1000) as u8])
-    })
+    gray
 }
 
 fn stretch(img: &mut GrayImage) {
@@ -120,7 +95,7 @@ fn bright_fraction(img: &GrayImage, threshold: u8) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use image::Rgba;
+    use image::{Luma, Rgba};
 
     #[test]
     fn otsu_splits_two_levels() {
@@ -141,12 +116,5 @@ mod tests {
         });
         let out = normalize(&crop);
         assert!(out.get_pixel(0, 0).0[0] > out.get_pixel(out.width() - 1, 0).0[0]);
-    }
-
-    #[test]
-    fn orange_pin_is_blanked() {
-        let crop = RgbaImage::from_pixel(2, 2, Rgba([240, 140, 30, 255]));
-        let gray = to_gray_without_pin(&crop);
-        assert!(gray.pixels().all(|p| p.0[0] == 0));
     }
 }
