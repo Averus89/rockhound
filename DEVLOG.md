@@ -1,5 +1,35 @@
 # Devlog
 
+## 2026-10-15: v0.5.5, end-to-end tests without the game
+
+Alan asked for app tests an agent or CI can run without the game, to work
+towards continuous delivery (minimumcd.org).
+
+- `ROCKHOUND_FAKE_GAME` plays a recorded game instead of capturing Star
+  Citizen: a video (decoded by ffmpeg, which also crops the search band, as
+  WGC copies only the band) or a folder of full-window screenshots. Frames
+  go through the same `capture_rect` and `readout_crop` as live capture, so
+  the locator is exercised too; only the frame grab differs.
+- `npm run e2e`: WebdriverIO drives the debug build through tauri-driver.
+  The spec starts a scan of a fake 5120x1440 game made from the two HUD
+  band fixtures, waits for 17,200 and then 21,500 with their matches, stops,
+  and saves a setting. Settings and data go to a fresh temp folder.
+- New CI job `e2e` (Linux, WebKitWebDriver under xvfb). WebdriverIO 10 is
+  used because 9 pulls in a vulnerable `basic-ftp` that fails `npm audit`.
+- WebKitWebDriver sends keys faster than Mantine's number field re-renders
+  and drops some, so the spec types at about 10 keys/s.
+- A debug build reads slower than real time (the 2 s switch shows after
+  about 6 s), so the spec allows 20 s for it.
+- Second spec, `problem-values`: plays Alan's live crops of the values that
+  have gone wrong (3,370 and 14,000 and 25,620 fail leave-one-out; 16,960
+  and 17,080 had 6/8 swaps; 25,680 is the mixed cluster) through
+  `ROCKHOUND_REPLAY_DIR` and checks each shows up, with 25,680 as "Mixed
+  cluster". The bundled templates contain these crops, so it guards against
+  regressions rather than measuring accuracy on unseen crops. Each spec gets
+  its own settings folder.
+- README: how to point an agent at the app, via WebDriver or, on Windows,
+  Playwright over WebView2's DevTools port.
+
 ## 2026-10-15: v0.5.4, review fixes before merging the stack
 
 From CodeRabbit's reviews when PRs #2 to #5 left draft:

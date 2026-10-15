@@ -26,6 +26,9 @@
 - [x] Windows exe + installer artifact in CI
 - [x] Coverage gate, frontend tests, cargo/npm audit, Dependabot
 - [ ] CodeQL if the repo goes public
+- [x] End-to-end UI tests on a fake game (WebdriverIO + tauri-driver, CI)
+- [ ] Overlay e2e check (needs a second window handle in the spec)
+- [ ] Run e2e on Windows too (msedgedriver must match the runner's WebView2)
 
 ## Known issues
 - Lines are scaled to 24 px, so templates carry across HUD scales, but a

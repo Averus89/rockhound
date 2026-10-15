@@ -198,6 +198,15 @@ mod tests {
     }
 
     #[test]
+    fn impossible_reads_are_rejected_however_clear() {
+        // No rock or cluster adds up to a value that isn't a multiple of 5,
+        // so a confident misread like 17,201 must still show nothing.
+        for text in ["17,201", "25,681", "1,234"] {
+            assert_eq!(resolve(&clear(text), &sample_db()).value, None, "{text}");
+        }
+    }
+
+    #[test]
     fn clean_read_of_a_mixed_cluster_resolves() {
         // 2 Laranite + 3 Copper; no single source explains it.
         let r = resolve(&clear("20,370"), &sample_db());

@@ -7,6 +7,7 @@
 
 mod capture;
 mod debug;
+mod fake_game;
 #[cfg(windows)]
 mod ocr;
 mod overlay;
@@ -25,12 +26,17 @@ use rockhound_core::{SignatureDb, TemplateSet};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State, WebviewWindowBuilder, WindowEvent};
 
+use crate::fake_game::FakeGame;
 use crate::reader::{Reader, Teacher};
 use crate::scanner::{ReplaySource, ScannerHandle};
 use crate::settings::Settings;
 
 /// Development aid: scan a folder of crops instead of the game.
 const REPLAY_DIR_ENV: &str = "ROCKHOUND_REPLAY_DIR";
+/// Testing aid: play a recorded game (a video or a folder of full-window
+/// screenshots) instead of capturing Star Citizen. Used by the end-to-end
+/// tests, which run without the game.
+const FAKE_GAME_ENV: &str = "ROCKHOUND_FAKE_GAME";
 
 struct Paths {
     settings: PathBuf,
@@ -150,20 +156,24 @@ fn open_source(
     settings: &Settings,
     interval: Duration,
 ) -> Result<Box<dyn scanner::FrameSource>, String> {
+    // An unfinished box (zero size) means automatic.
+    let region = settings.region.filter(|r| r[2] > 0 && r[3] > 0);
+    if let Some(path) = std::env::var_os(FAKE_GAME_ENV) {
+        return Ok(Box::new(FakeGame::open(
+            &PathBuf::from(path),
+            region,
+            interval,
+        )?));
+    }
     if let Some(dir) = std::env::var_os(REPLAY_DIR_ENV) {
         return Ok(Box::new(ReplaySource::open(&PathBuf::from(dir))?));
     }
     #[cfg(windows)]
-    return Ok(Box::new(capture::LiveSource::start(
-        // An unfinished box (zero size) means automatic.
-        settings.region.filter(|r| r[2] > 0 && r[3] > 0),
-        interval,
-    )?));
+    return Ok(Box::new(capture::LiveSource::start(region, interval)?));
     #[cfg(not(windows))]
-    {
-        let _ = (settings, interval);
-        Err("Live capture needs Windows; set ROCKHOUND_REPLAY_DIR to replay frames.".into())
-    }
+    Err(format!(
+        "Live capture needs Windows; set {FAKE_GAME_ENV} to play a recorded game."
+    ))
 }
 
 #[tauri::command]

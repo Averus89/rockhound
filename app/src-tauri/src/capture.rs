@@ -4,6 +4,9 @@
 //! thread; only the part of the frame the readout can be in is copied off
 //! the GPU. Each scan tick locates the readout in the newest copy, since the
 //! pin moves with the ship.
+//!
+//! The band and readout helpers are shared with [`crate::fake_game`], so a
+//! recorded game goes through the same steps.
 
 use image::{imageops, RgbaImage};
 use rockhound_core::locate;
@@ -39,8 +42,7 @@ const SEARCH_BAND: [f32; 3] = [0.3, 0.25, 0.5];
 
 /// Pixel rectangle (x, y, width, height) of the search band, or of the
 /// player's own region when they set one, clamped to the window.
-#[cfg_attr(not(windows), allow(dead_code))]
-fn capture_rect(width: u32, height: u32, region: Option<[u32; 4]>) -> Option<[u32; 4]> {
+pub fn capture_rect(width: u32, height: u32, region: Option<[u32; 4]>) -> Option<[u32; 4]> {
     let [x, y, w, h] = region.unwrap_or_else(|| {
         let [half_width, top, bottom] = SEARCH_BAND.map(|f| (f * height as f32) as u32);
         let x = (width / 2).saturating_sub(half_width);
@@ -55,8 +57,7 @@ fn capture_rect(width: u32, height: u32, region: Option<[u32; 4]>) -> Option<[u3
 
 /// The readout crop inside a captured band, or `None` when it isn't on
 /// screen. A player-set region is used as is.
-#[cfg_attr(not(windows), allow(dead_code))]
-fn readout_crop(
+pub fn readout_crop(
     band: &RgbaImage,
     manual_region: bool,
     snapshot: &mut debug::Throttle,
