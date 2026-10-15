@@ -21,6 +21,9 @@
 
 ## Milestone 4: overlay
 ## Milestone 5: packaging + release workflow
+- [x] Windows exe + installer artifact in CI
+- [x] Coverage gate, frontend tests, cargo/npm audit, Dependabot
+- [ ] CodeQL if the repo goes public
 
 ## Known issues
 - Lines are scaled to 24 px, so templates carry across HUD scales, but a
