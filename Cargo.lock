@@ -2714,7 +2714,7 @@ dependencies = [
 
 [[package]]
 name = "rockhound-core"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "image",
  "serde",
@@ -2724,7 +2724,7 @@ dependencies = [
 
 [[package]]
 name = "rockhound-replay"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "anyhow",
  "clap",
