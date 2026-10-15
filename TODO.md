@@ -20,6 +20,8 @@
 - [ ] Ship templates with the app instead of the app data folder
 
 ## Milestone 4: overlay
+- [x] Click-through always-on-top overlay window with the current value
+- [ ] Let the player move the overlay (drag mode or position setting)
 ## Milestone 5: packaging + release workflow
 - [x] Windows exe + installer artifact in CI
 - [x] Coverage gate, frontend tests, cargo/npm audit, Dependabot
