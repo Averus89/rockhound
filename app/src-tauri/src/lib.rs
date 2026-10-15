@@ -120,7 +120,7 @@ fn start_scan(app: AppHandle, state: State<'_, AppState>) -> Result<(), String> 
 
 /// Templates learned so far plus the OCR teacher that adds to them.
 fn open_reader(template_dir: &Path) -> Result<Reader, String> {
-    let templates = match TemplateSet::load_dir(template_dir) {
+    let learned = match TemplateSet::load_dir(template_dir) {
         Ok(t) => t,
         // First run: nothing learned yet.
         Err(TemplateError::Empty(_)) => TemplateSet::default(),
@@ -133,11 +133,9 @@ fn open_reader(template_dir: &Path) -> Result<Reader, String> {
     let teacher: Option<Box<dyn Teacher>> = Some(Box::new(ocr::WindowsOcr::default()));
     #[cfg(not(windows))]
     let teacher: Option<Box<dyn Teacher>> = None;
-    if templates.is_empty() && teacher.is_none() {
-        return Err("No digit templates yet; build some with rockhound-replay learn.".into());
-    }
     Ok(Reader::new(
-        templates,
+        rockhound_core::bundled_templates(),
+        learned,
         Some(template_dir.to_path_buf()),
         teacher,
     ))

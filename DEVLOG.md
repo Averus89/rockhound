@@ -1,5 +1,29 @@
 # Devlog
 
+## 2026-10-15: v0.5.0, built-in digit templates from live crops
+
+Alan's v0.4.5 debug session: the readout was located on most frames, but
+Windows OCR returned nothing on every crop (one "T7,080", one "zł500"), so
+nothing was learned. OCR at this size is a dead end for teaching.
+
+- 22 of the session's readout crops, labelled by eye, are shipped in
+  `data/glyphs/1440p/<value>-<n>.png` (all ten digits). A build script in
+  rockhound-core embeds them; `bundled_templates()` learns from them, and
+  the app reads with those plus whatever the player has learned. Only the
+  learned part is saved to the templates folder.
+- The matcher only accepts reads in the HUD's number format (1-3 digits,
+  then ",ddd" groups, no leading zero), so stray commas and extra digits
+  can't win.
+- Learning splits a labelled line with a DP over all cuts instead of
+  placing them one by one; the narrow "1" in "14,000" used to make every
+  14,000 crop fail to teach.
+- Lines are matched at 48 px instead of 24 (leave-one-out over the live
+  crops: 14/22 -> 18/22), with correlation via prefix sums so a read takes
+  ~5 ms instead of ~60. Templates saved at another height are rescaled on
+  load.
+- New tests: bundled templates cover every digit; leave-one-out accuracy on
+  the live crops stays at or above 18/22; HUD grammar.
+
 ## 2026-10-15: v0.4.5, OCR teacher input and learning
 
 From Alan's first debug log (v0.4.4): the readout was located on most

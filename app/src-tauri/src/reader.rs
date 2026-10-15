@@ -26,9 +26,9 @@ pub trait Teacher: Send {
     fn read_text(&mut self, line: &GrayImage) -> Option<String>;
 }
 
-/// Scale of the digit line handed to the teacher, over the template
-/// line height (24 px): OCR engines want text well over 20 px tall.
-const TEACHER_SCALE: u32 = 2;
+/// Scale of the digit line handed to the teacher, over the template line
+/// height (48 px, already well over the ~20 px OCR engines want).
+const TEACHER_SCALE: u32 = 1;
 /// White margin around it, in pixels; OCR misses text touching the edge.
 const TEACHER_MARGIN: u32 = 24;
 
@@ -54,7 +54,10 @@ pub fn teacher_input(crop: &RgbaImage) -> Option<GrayImage> {
 }
 
 pub struct Reader {
+    /// Shipped templates followed by the player's learned ones.
     templates: TemplateSet,
+    /// How many of `templates` are shipped; only the rest are saved.
+    base_len: usize,
     /// Where learned templates are saved; `None` keeps them in memory.
     template_dir: Option<PathBuf>,
     teacher: Option<Box<dyn Teacher>>,
@@ -66,12 +69,17 @@ pub struct Reader {
 
 impl Reader {
     pub fn new(
-        templates: TemplateSet,
+        base: TemplateSet,
+        learned: TemplateSet,
         template_dir: Option<PathBuf>,
         teacher: Option<Box<dyn Teacher>>,
     ) -> Self {
+        let base_len = base.len();
+        let mut templates = base;
+        templates.extend(learned);
         Self {
             templates,
+            base_len,
             template_dir,
             teacher,
             last_taught: None,
@@ -141,7 +149,7 @@ impl Reader {
 
     fn save_templates(&self) {
         if let Some(dir) = &self.template_dir {
-            if let Err(e) = self.templates.save_dir(dir) {
+            if let Err(e) = self.templates.tail(self.base_len).save_dir(dir) {
                 // Learning still helps this session; it just won't persist.
                 eprintln!("{e}");
             }
@@ -200,6 +208,7 @@ mod tests {
     fn teacher_reads_until_templates_learn() {
         let mut reader = Reader::new(
             TemplateSet::default(),
+            TemplateSet::default(),
             None,
             Some(Box::new(FixedTeacher("17,2OO"))),
         );
@@ -216,7 +225,8 @@ mod tests {
         assert!(!reader.templates.is_empty(), "two agreeing reads teach");
 
         // Templates alone now read the other frame.
-        let mut templates_only = Reader::new(reader.templates.clone(), None, None);
+        let mut templates_only =
+            Reader::new(reader.templates.clone(), TemplateSet::default(), None, None);
         let read = templates_only.read(&fixture("hud_17200_pin.png"), &db());
         assert_eq!(read.and_then(|r| r.value), Some(17200));
     }
@@ -224,6 +234,7 @@ mod tests {
     #[test]
     fn teacher_values_the_table_cant_explain_are_ignored() {
         let mut reader = Reader::new(
+            TemplateSet::default(),
             TemplateSet::default(),
             None,
             Some(Box::new(FixedTeacher("17,201"))),
@@ -248,7 +259,12 @@ mod tests {
                 )
             }
         }
-        let mut reader = Reader::new(TemplateSet::default(), None, Some(Box::new(Flaky(0))));
+        let mut reader = Reader::new(
+            TemplateSet::default(),
+            TemplateSet::default(),
+            None,
+            Some(Box::new(Flaky(0))),
+        );
         let crop = fixture("hud_17200.png");
         for _ in 0..3 {
             reader.last_taught = None;
@@ -260,7 +276,10 @@ mod tests {
     #[test]
     fn teacher_input_is_dark_digits_on_white_with_a_margin() {
         let input = teacher_input(&fixture("hud_17200_pin.png")).unwrap();
-        assert_eq!(input.height(), 24 * TEACHER_SCALE + 2 * TEACHER_MARGIN);
+        assert_eq!(
+            input.height(),
+            rockhound_core::recognize::LINE_HEIGHT * TEACHER_SCALE + 2 * TEACHER_MARGIN
+        );
         assert!(input.pixels().all(|p| p.0[0] == 0 || p.0[0] == 255));
         let dark = input.pixels().filter(|p| p.0[0] == 0).count();
         assert!(dark > 0 && dark * 3 < input.pixels().len(), "{dark}");

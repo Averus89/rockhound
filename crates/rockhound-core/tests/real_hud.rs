@@ -70,3 +70,45 @@ fn reads_digits_with_strong_colour_fringes() {
         Some(21500)
     );
 }
+
+/// Labelled live crops shipped in data/glyphs/1440p, as (value, image).
+fn live_crops() -> Vec<(u32, image::RgbaImage)> {
+    let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../data/glyphs/1440p");
+    let mut out: Vec<(String, u32, image::RgbaImage)> = std::fs::read_dir(dir)
+        .unwrap()
+        .flatten()
+        .map(|e| {
+            let name = e.file_name().to_string_lossy().to_string();
+            let value = name.split('-').next().unwrap().parse().unwrap();
+            (name, value, image::open(e.path()).unwrap().to_rgba8())
+        })
+        .collect();
+    out.sort_by(|a, b| a.0.cmp(&b.0));
+    out.into_iter().map(|(_, v, img)| (v, img)).collect()
+}
+
+#[test]
+fn bundled_templates_cover_every_digit() {
+    let missing = rockhound_core::bundled_templates().missing_digits();
+    assert!(missing.is_empty(), "{missing:?}");
+}
+
+#[test]
+fn reads_unseen_live_crops() {
+    // Leave-one-out over Alan's live 1440p crops: learn from all but one,
+    // read that one. A ratchet: raise the floor as accuracy improves.
+    let crops = live_crops();
+    let correct = (0..crops.len())
+        .filter(|&i| {
+            let mut templates = TemplateSet::default();
+            for (j, (value, crop)) in crops.iter().enumerate() {
+                if j != i {
+                    learn_crop(crop, *value, &mut templates);
+                }
+            }
+            let (value, crop) = &crops[i];
+            read_crop(crop, &templates, &db()).and_then(|r| r.value) == Some(*value)
+        })
+        .count();
+    assert!(correct >= 18, "{correct}/{} read correctly", crops.len());
+}

@@ -15,7 +15,7 @@ use crate::layout::Rect;
 use crate::preprocess::otsu;
 
 /// Lines are scaled to this height before learning or matching.
-pub const LINE_HEIGHT: u32 = 24;
+pub const LINE_HEIGHT: u32 = 48;
 /// Samples kept per character; more adds time without adding accuracy.
 pub const MAX_SAMPLES_PER_CHAR: usize = 12;
 /// Separator cell width relative to a digit cell, used to split a labelled
@@ -74,6 +74,15 @@ struct Sample {
 
 impl Sample {
     fn new(ch: char, image: GrayImage) -> Self {
+        // Templates saved by an older version may use another line height.
+        let image = if image.height() == LINE_HEIGHT {
+            image
+        } else {
+            let width = (image.width() * LINE_HEIGHT)
+                .div_ceil(image.height().max(1))
+                .max(1);
+            imageops::resize(&image, width, LINE_HEIGHT, imageops::FilterType::Triangle)
+        };
         let vector = unit_vector(image.pixels().map(|p| f32::from(p.0[0])));
         Self { ch, image, vector }
     }
@@ -102,6 +111,36 @@ pub fn line_image(gray: &GrayImage, line: &Rect) -> GrayImage {
     imageops::resize(&crop, width, LINE_HEIGHT, imageops::FilterType::Triangle)
 }
 
+/// How the matcher reached a DP cell.
+#[derive(Debug, Clone, Copy)]
+enum Step {
+    None,
+    Skip,
+    Glyph { prev: usize, sample: usize },
+}
+
+/// The HUD's number format as a tiny automaton: one to three digits (no
+/// leading zero), then groups of a comma and three digits. Matching only
+/// reads it can produce stops stray commas and extra digits from winning.
+struct Hud;
+
+impl Hud {
+    const START: usize = 0;
+    /// 1..=3: leading digits so far; 4..=7: digits after the last comma.
+    const STATES: usize = 8;
+    const ACCEPT: [usize; 4] = [1, 2, 3, 7];
+
+    fn next(q: usize, ch: char) -> Option<usize> {
+        match (q, ch) {
+            (Self::START, '1'..='9') => Some(1),
+            (1 | 2, '0'..='9') => Some(q + 1),
+            (1..=3 | 7, ',') => Some(4),
+            (4..=6, '0'..='9') => Some(q + 1),
+            _ => None,
+        }
+    }
+}
+
 /// Stored glyph samples.
 #[derive(Debug, Clone, Default)]
 pub struct TemplateSet {
@@ -115,6 +154,19 @@ impl TemplateSet {
 
     pub fn len(&self) -> usize {
         self.samples.len()
+    }
+
+    /// Append all of `other`'s samples, ignoring the per-character cap.
+    pub fn extend(&mut self, other: TemplateSet) {
+        self.samples.extend(other.samples);
+    }
+
+    /// The samples from index `start` on, e.g. the ones learned after a
+    /// bundled base set.
+    pub fn tail(&self, start: usize) -> TemplateSet {
+        TemplateSet {
+            samples: self.samples.get(start..).unwrap_or_default().to_vec(),
+        }
     }
 
     /// Digits that have no sample yet.
@@ -163,35 +215,59 @@ impl TemplateSet {
         }
         let w = line.width() as usize;
         let ink = column_ink(line);
+        let prepared = Line::new(line);
 
-        // best[e]: best score explaining columns 0..e; from[e]: how we got there.
-        let mut best = vec![f32::NEG_INFINITY; w + 1];
-        let mut from: Vec<Option<(usize, usize)>> = vec![None; w + 1]; // (start, sample)
-        best[0] = 0.0;
+        // best[e][q]: best score explaining columns 0..e and ending in
+        // grammar state q; from[e][q]: how we got there.
+        let mut best = vec![[f32::NEG_INFINITY; Hud::STATES]; w + 1];
+        let mut from: Vec<[Step; Hud::STATES]> = vec![[Step::None; Hud::STATES]; w + 1];
+        best[0][Hud::START] = 0.0;
         for e in 1..=w {
-            best[e] = best[e - 1] - ink[e - 1] * SKIP_INK_COST;
+            for q in 0..Hud::STATES {
+                let skipped = best[e - 1][q] - ink[e - 1] * SKIP_INK_COST;
+                if skipped > best[e][q] {
+                    best[e][q] = skipped;
+                    from[e][q] = Step::Skip;
+                }
+            }
             for (i, s) in self.samples.iter().enumerate() {
                 let sw = s.width() as usize;
-                if sw > e || best[e - sw] == f32::NEG_INFINITY {
+                if sw > e {
                     continue;
                 }
-                let score = best[e - sw] + sw as f32 * (correlate(line, e - sw, s) - MATCH_BIAS);
-                if score > best[e] {
-                    best[e] = score;
-                    from[e] = Some((e - sw, i));
+                let gain = sw as f32 * (prepared.correlate(e - sw, s) - MATCH_BIAS);
+                for q in 0..Hud::STATES {
+                    let Some(next) = Hud::next(q, s.ch) else {
+                        continue;
+                    };
+                    let score = best[e - sw][q] + gain;
+                    if score > best[e][next] {
+                        best[e][next] = score;
+                        from[e][next] = Step::Glyph { prev: q, sample: i };
+                    }
                 }
             }
         }
 
+        let Some(mut q) = Hud::ACCEPT
+            .iter()
+            .copied()
+            .filter(|&q| best[w][q] > f32::NEG_INFINITY)
+            .max_by(|&a, &b| best[w][a].total_cmp(&best[w][b]))
+        else {
+            return Vec::new();
+        };
         let mut glyphs = Vec::new();
         let mut e = w;
         while e > 0 {
-            match from[e] {
-                Some((start, i)) => {
-                    glyphs.push(self.describe(line, start, self.samples[i].ch));
-                    e = start;
+            match from[e][q] {
+                Step::Glyph { prev, sample } => {
+                    let start = e - self.samples[sample].width() as usize;
+                    glyphs.push(self.describe(&prepared, start, self.samples[sample].ch));
+                    (e, q) = (start, prev);
                 }
-                None => e -= 1,
+                Step::Skip => e -= 1,
+                Step::None => break,
             }
         }
         glyphs.reverse();
@@ -199,13 +275,13 @@ impl TemplateSet {
     }
 
     /// Score every character at `start` to report the best and runner-up.
-    fn describe(&self, line: &GrayImage, start: usize, chosen: char) -> GlyphRead {
+    fn describe(&self, line: &Line, start: usize, chosen: char) -> GlyphRead {
         let mut per_char: Vec<(char, f32)> = Vec::new();
         for s in &self.samples {
-            if start + s.width() as usize > line.width() as usize {
+            if start + s.width() as usize > line.width {
                 continue;
             }
-            let score = correlate(line, start, s);
+            let score = line.correlate(start, s);
             match per_char.iter_mut().find(|(c, _)| *c == s.ch) {
                 Some(entry) => entry.1 = entry.1.max(score),
                 None => per_char.push((s.ch, score)),
@@ -295,13 +371,55 @@ fn parse_template_name(name: &str) -> Option<char> {
 }
 
 /// Correlation between the template and the line window starting at `x`.
-fn correlate(line: &GrayImage, x: usize, s: &Sample) -> f32 {
-    let (sw, h) = (s.width(), line.height().min(s.image.height()));
-    let window = unit_vector(
-        (0..h)
-            .flat_map(|y| (0..sw).map(move |dx| f32::from(line.get_pixel(x as u32 + dx, y).0[0]))),
-    );
-    window.iter().zip(&s.vector).map(|(a, b)| a * b).sum()
+/// A line image prepared for repeated correlation: pixels as floats plus
+/// per-column prefix sums, so each window's mean and spread cost O(1).
+struct Line {
+    width: usize,
+    height: usize,
+    pixels: Vec<f32>,
+    /// sum[x] / sq[x]: sum of pixel values / squares over columns 0..x.
+    sum: Vec<f32>,
+    sq: Vec<f32>,
+}
+
+impl Line {
+    fn new(img: &GrayImage) -> Self {
+        let (width, height) = (img.width() as usize, img.height() as usize);
+        let pixels: Vec<f32> = img.pixels().map(|p| f32::from(p.0[0])).collect();
+        let (mut sum, mut sq) = (vec![0.0; width + 1], vec![0.0; width + 1]);
+        for x in 0..width {
+            let col = (0..height).map(|y| pixels[y * width + x]);
+            sum[x + 1] = sum[x] + col.clone().sum::<f32>();
+            sq[x + 1] = sq[x] + col.map(|v| v * v).sum::<f32>();
+        }
+        Self {
+            width,
+            height,
+            pixels,
+            sum,
+            sq,
+        }
+    }
+
+    /// Normalized cross-correlation of sample `s` with the window starting
+    /// at column `x`, in [-1, 1]. The sample vector is zero-mean and unit
+    /// length, so only the window's spread needs computing.
+    fn correlate(&self, x: usize, s: &Sample) -> f32 {
+        let sw = s.width() as usize;
+        let n = (sw * self.height) as f32;
+        let sum = self.sum[x + sw] - self.sum[x];
+        let var = (self.sq[x + sw] - self.sq[x]) - sum * sum / n;
+        if var <= f32::EPSILON {
+            return 0.0;
+        }
+        let mut dot = 0.0;
+        for y in 0..self.height {
+            let row = &self.pixels[y * self.width + x..y * self.width + x + sw];
+            let tmpl = &s.vector[y * sw..(y + 1) * sw];
+            dot += row.iter().zip(tmpl).map(|(a, b)| a * b).sum::<f32>();
+        }
+        dot / var.sqrt()
+    }
 }
 
 /// Fraction of each column that is ink.
@@ -317,42 +435,86 @@ fn column_ink(line: &GrayImage) -> Vec<f32> {
         .collect()
 }
 
-/// Split a line into one cell per character, before any templates exist:
-/// give digits equal widths and separators a narrower share, then move each
-/// cut to the emptiest nearby column.
+/// Cell widths allowed, as fractions of the expected width: a "1" is much
+/// narrower than other digits in the HUD font.
+const CELL_WIDTH_RANGE: (f32, f32) = (0.4, 1.7);
+/// Weight of a cell's deviation from its expected width against the ink
+/// a cut passes through.
+const WIDTH_COST: f32 = 0.3;
+
+/// Split a line into one cell per character, before any templates exist.
+///
+/// Digits are expected to share the width equally and separators to take a
+/// narrower share; the cuts are then chosen together (DP) to pass through
+/// as little ink as possible while keeping every cell a plausible width.
+/// Placing cuts one at a time failed when a narrow "1" shifted the rest.
 fn split_cells(line: &GrayImage, chars: &[char]) -> Option<Vec<(u32, u32)>> {
-    let w = line.width() as f32;
+    let w = line.width() as usize;
     let seps = chars.iter().filter(|c| **c == ',').count() as f32;
     let digits = chars.len() as f32 - seps;
     if digits < 1.0 {
         return None;
     }
-    let digit_w = w / (digits + seps * SEPARATOR_WIDTH_RATIO);
-    let ink = column_ink(line);
-    let reach = (digit_w / 4.0).round() as i64;
-
-    let mut cuts = vec![0u32];
-    let mut pos = 0.0;
-    for c in &chars[..chars.len() - 1] {
-        pos += if *c == ',' {
+    let digit_w = w as f32 / (digits + seps * SEPARATOR_WIDTH_RATIO);
+    let expected = |c: char| {
+        if c == ',' {
             digit_w * SEPARATOR_WIDTH_RATIO
         } else {
             digit_w
-        };
-        let guess = pos.round() as i64;
-        let prev = i64::from(*cuts.last()?);
-        let cut = (guess - reach..=guess + reach)
-            .filter(|&x| x > prev && x < w as i64)
-            .min_by(|&a, &b| {
-                ink[a as usize]
-                    .total_cmp(&ink[b as usize])
-                    .then((a - guess).abs().cmp(&(b - guess).abs()))
-            })?;
-        cuts.push(cut as u32);
+        }
+    };
+    let ink = column_ink(line);
+
+    // cost[k][x]: best cost of cutting the first k cells with cell k ending
+    // at column x; prev[k][x] is where that cell started.
+    let n = chars.len();
+    let mut cost = vec![vec![f32::INFINITY; w + 1]; n + 1];
+    let mut prev = vec![vec![0usize; w + 1]; n + 1];
+    cost[0][0] = 0.0;
+    for (k, &c) in chars.iter().enumerate() {
+        let exp = expected(c);
+        let min_w = ((exp * CELL_WIDTH_RANGE.0).floor() as usize).max(2);
+        let max_w = (exp * CELL_WIDTH_RANGE.1).ceil() as usize;
+        for x0 in 0..w {
+            if cost[k][x0].is_infinite() {
+                continue;
+            }
+            for cw in min_w..=max_w {
+                let x1 = x0 + cw;
+                if x1 > w {
+                    break;
+                }
+                // The last cell must end at the line's edge; inner cuts pay
+                // for the ink they pass through.
+                let cut = if k + 1 == n {
+                    if x1 != w {
+                        continue;
+                    }
+                    0.0
+                } else {
+                    ink[x1.min(w - 1)]
+                };
+                let dev = (cw as f32 - exp) / exp;
+                let total = cost[k][x0] + cut + WIDTH_COST * dev * dev;
+                if total < cost[k + 1][x1] {
+                    cost[k + 1][x1] = total;
+                    prev[k + 1][x1] = x0;
+                }
+            }
+        }
     }
-    cuts.push(line.width());
-    let cells: Vec<(u32, u32)> = cuts.windows(2).map(|p| (p[0], p[1])).collect();
-    cells.iter().all(|(a, b)| b - a >= 2).then_some(cells)
+    if cost[n][w].is_infinite() {
+        return None;
+    }
+    let mut cells = Vec::with_capacity(n);
+    let mut x1 = w;
+    for k in (1..=n).rev() {
+        let x0 = prev[k][x1];
+        cells.push((x0 as u32, x1 as u32));
+        x1 = x0;
+    }
+    cells.reverse();
+    Some(cells)
 }
 
 #[cfg(test)]
@@ -434,6 +596,21 @@ pub(crate) mod tests {
             .iter()
             .map(|g| g.best)
             .collect()
+    }
+
+    #[test]
+    fn hud_grammar_allows_only_grouped_numbers() {
+        let accepts = |text: &str| {
+            text.chars()
+                .try_fold(Hud::START, Hud::next)
+                .is_some_and(|q| Hud::ACCEPT.contains(&q))
+        };
+        for ok in ["7", "17,200", "3,370", "100,000", "1,000,000"] {
+            assert!(accepts(ok), "{ok}");
+        }
+        for bad in ["", "0", "017", "1,,000", "17,20", "1720,0", "1,0000", ","] {
+            assert!(!accepts(bad), "{bad}");
+        }
     }
 
     #[test]

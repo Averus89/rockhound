@@ -182,7 +182,7 @@ mod tests {
         let (stopped, got_stop) = mpsc::channel();
         let handle = spawn(
             Box::new(Frames(3)),
-            Reader::new(templates, None, None),
+            Reader::new(templates, TemplateSet::default(), None, None),
             Arc::new(RwLock::new(db)),
             Duration::from_millis(1),
             move |r| readings.send(r).unwrap(),
