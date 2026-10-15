@@ -64,7 +64,10 @@ cd app && npm run e2e          # the whole app, driven through WebDriver
 uses [WebdriverIO](https://webdriver.io) with
 [tauri-driver](https://v2.tauri.app/develop/tests/webdriver/) to click
 through the main window like a player: Start, see 17,200 and then 21,500
-with their matches, Stop, change a setting. Specs live in `app/e2e/`. CI runs
+with their matches, Stop, change a setting. A second spec plays live crops
+of the values that have misread before (3,370, 14,000, 16,960, 17,080,
+25,620 and the mixed cluster 25,680) and checks each one is shown. Specs live
+in `app/e2e/`. CI runs
 them on Linux under a virtual display on every push.
 
 It needs `tauri-driver` (`cargo install tauri-driver --locked`) and ffmpeg.

@@ -20,6 +20,13 @@ towards continuous delivery (minimumcd.org).
   and drops some, so the spec types at about 10 keys/s.
 - A debug build reads slower than real time (the 2 s switch shows after
   about 6 s), so the spec allows 20 s for it.
+- Second spec, `problem-values`: plays Alan's live crops of the values that
+  have gone wrong (3,370 and 14,000 and 25,620 fail leave-one-out; 16,960
+  and 17,080 had 6/8 swaps; 25,680 is the mixed cluster) through
+  `ROCKHOUND_REPLAY_DIR` and checks each shows up, with 25,680 as "Mixed
+  cluster". The bundled templates contain these crops, so it guards against
+  regressions rather than measuring accuracy on unseen crops. Each spec gets
+  its own settings folder.
 - README: how to point an agent at the app, via WebDriver or, on Windows,
   Playwright over WebView2's DevTools port.
 
