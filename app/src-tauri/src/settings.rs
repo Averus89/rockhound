@@ -12,6 +12,8 @@ pub struct Settings {
     /// Time between reads. 250 ms keeps the UI snappy at negligible CPU now
     /// that a read costs a few milliseconds.
     pub interval_ms: u64,
+    /// Show the click-through overlay over the game.
+    pub overlay: bool,
 }
 
 impl Default for Settings {
@@ -19,6 +21,7 @@ impl Default for Settings {
         Self {
             region: None,
             interval_ms: 250,
+            overlay: false,
         }
     }
 }
@@ -53,6 +56,7 @@ mod tests {
         let s = Settings {
             region: Some([1, 2, 3, 4]),
             interval_ms: 100,
+            overlay: true,
         };
         s.save(&path).unwrap();
         assert_eq!(Settings::load(&path), s);

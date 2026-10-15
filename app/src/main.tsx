@@ -4,7 +4,10 @@ import { createTheme, MantineProvider } from "@mantine/core";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
+import { getCurrentWindow } from "@tauri-apps/api/window";
+
 import { App } from "./App";
+import { Overlay } from "./Overlay";
 
 const theme = createTheme({
   primaryColor: "orange",
@@ -16,7 +19,7 @@ const theme = createTheme({
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <MantineProvider theme={theme} forceColorScheme="dark">
-      <App />
+      {getCurrentWindow().label === "overlay" ? <Overlay /> : <App />}
     </MantineProvider>
   </StrictMode>,
 );

@@ -76,6 +76,12 @@ export function SettingsModal({ opened, settings, onClose, onSave }: Props) {
             />
           ))}
         </SimpleGrid>
+        <Switch
+          label="Show overlay over the game"
+          description="A small click-through readout at the top of the screen."
+          checked={draft.overlay}
+          onChange={(e) => setDraft({ ...draft, overlay: e.currentTarget.checked })}
+        />
         <NumberInput
           label="Read every (ms)"
           min={50}
