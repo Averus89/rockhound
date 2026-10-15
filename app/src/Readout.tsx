@@ -3,7 +3,15 @@ import { IconRadar } from "@tabler/icons-react";
 
 import type { Reading } from "./api";
 import { CategoryIcon } from "./CategoryIcon";
-import { CATEGORY_LABEL, formatSignature, matchLabel, tierColor } from "./format";
+import {
+  CATEGORY_LABEL,
+  SHOWN_MIXES,
+  formatSignature,
+  matchLabel,
+  mixLabel,
+  tierColor,
+  unmatchedLabel,
+} from "./format";
 
 export function Readout({ reading, scanning }: { reading: Reading | null; scanning: boolean }) {
   if (!reading || reading.value === null) {
@@ -61,7 +69,21 @@ export function Readout({ reading, scanning }: { reading: Reading | null; scanni
             )}
           </Group>
         ) : (
-          <Text c="dimmed">Unknown signature</Text>
+          <Text c="dimmed">{unmatchedLabel(reading)}</Text>
+        )}
+        {reading.mixes.length > 0 && (
+          <Stack gap={2}>
+            {reading.mixes.slice(0, SHOWN_MIXES).map((pair) => (
+              <Text key={mixLabel(pair)} size="sm">
+                {mixLabel(pair)}
+              </Text>
+            ))}
+            {reading.mixes.length > SHOWN_MIXES && (
+              <Text size="xs" c="dimmed">
+                and {reading.mixes.length - SHOWN_MIXES} other mixes
+              </Text>
+            )}
+          </Stack>
         )}
         {best && (
           <Group gap={6} c="dimmed">

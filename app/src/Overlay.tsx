@@ -2,7 +2,7 @@ import { Badge, Group, Stack, Text } from "@mantine/core";
 import { useEffect, useState } from "react";
 
 import { onReading, type Reading } from "./api";
-import { formatSignature, matchLabel, tierColor } from "./format";
+import { formatSignature, matchLabel, tierColor, unmatchedLabel } from "./format";
 
 /** Compact readout for the click-through overlay window. */
 export function OverlayCard({ reading }: { reading: Reading | null }) {
@@ -26,7 +26,7 @@ export function OverlayCard({ reading }: { reading: Reading | null }) {
       </Text>
       <Stack gap={2}>
         <Text fw={650} lh={1.2} lineClamp={1}>
-          {best ? matchLabel(best) : "Unknown"}
+          {best ? matchLabel(best) : unmatchedLabel(reading)}
         </Text>
         {best?.tier && (
           <Badge size="xs" variant="light" color={color}>

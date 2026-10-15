@@ -1,5 +1,19 @@
 # Devlog
 
+## 2026-10-15: v0.5.2, mixed clusters
+
+Alan chose to show values only a mix of minerals explains (25,680 =
+2 x 4,270 + 4 x 4,285) instead of hiding them.
+
+- `SignatureDb::mixes` lists two-mineral ship-mining clusters of up to 12
+  rocks that add up to a value, fewest rocks first, then same-tier pairs.
+- `resolve` keeps such a value only when every glyph scores at least 0.8:
+  almost any multiple of 5 is some mix, so the table can't catch a misread.
+  Over both debug sessions' 119 crops, only the real 25,680 resolves this
+  way.
+- The readout shows "Mixed cluster" with the first three mixes and a count
+  of the rest; the overlay and history say "Mixed cluster".
+
 ## 2026-10-15: v0.5.1, more live crops; 25,680 is not in the table
 
 Alan's v0.5.0 debug session misread 25,620 and 25,680. Reading the 74
@@ -16,7 +30,7 @@ saved crops with the shipped templates showed two causes:
   19/25). A read takes ~15 ms with ~260 samples.
 - 25,680 is not a multiple of any signature in the table (it is
   2 x 4,270 + 4 x 4,285, a mixed cluster), so even a correct read is
-  rejected. Still open.
+  rejected (handled in v0.5.2).
 
 ## 2026-10-15: v0.5.0, built-in digit templates from live crops
 

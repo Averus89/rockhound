@@ -1,7 +1,7 @@
 import { ColorSwatch, Group, Paper, Stack, Text } from "@mantine/core";
 
 import type { Reading } from "./api";
-import { formatSignature, matchLabel, tierColor } from "./format";
+import { formatSignature, matchLabel, tierColor, unmatchedLabel } from "./format";
 
 export function History({ readings }: { readings: Reading[] }) {
   if (readings.length === 0) return null;
@@ -24,7 +24,7 @@ export function History({ readings }: { readings: Reading[] }) {
                 {formatSignature(r.value ?? 0)}
               </Text>
               <Text size="sm" truncate style={{ flex: 1 }}>
-                {best ? matchLabel(best) : "Unknown"}
+                {best ? matchLabel(best) : unmatchedLabel(r)}
               </Text>
               <Text size="xs" c="dimmed">
                 {new Date(r.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}

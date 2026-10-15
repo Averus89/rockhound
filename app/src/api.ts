@@ -17,6 +17,8 @@ export interface Reading {
   confidence: number;
   corrected: boolean;
   matches: SignatureMatch[];
+  /** Two-mineral clusters adding up to the value, when no single source does. */
+  mixes: [SignatureMatch, SignatureMatch][];
   at: number;
 }
 

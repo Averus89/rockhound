@@ -8,6 +8,10 @@ use crate::signatures::{SignatureDb, SignatureMatch};
 /// A glyph whose best and runner-up scores are closer than this is ambiguous
 /// (the classic case is 6 vs 8 on a blurry frame).
 pub const AMBIGUOUS_MARGIN: f32 = 0.08;
+/// Every glyph must score at least this for a value only a mixed cluster
+/// explains: almost any multiple of 5 is some mix, so the table can't catch
+/// a misread there and the read itself has to be clean.
+pub const MIXED_MIN_CONFIDENCE: f32 = 0.8;
 /// At most this many ambiguous glyphs are tried both ways (2^n candidates).
 const MAX_AMBIGUOUS: usize = 3;
 
@@ -27,7 +31,8 @@ pub struct Resolved {
 /// Pick the highest-scoring reading that exists in the signature table.
 ///
 /// Only ambiguous glyphs may be swapped, so a clear misread is never
-/// "corrected" into some unrelated valid value.
+/// "corrected" into some unrelated valid value. A reading only a mixed
+/// cluster explains is kept as read, when every glyph is clean.
 pub fn resolve(reads: &[GlyphRead], db: &SignatureDb) -> Resolved {
     let raw: String = reads.iter().map(|r| r.best).collect();
     let digits: Vec<&GlyphRead> = reads.iter().filter(|r| r.best != ',').collect();
@@ -74,13 +79,21 @@ pub fn resolve(reads: &[GlyphRead], db: &SignatureDb) -> Resolved {
             corrected,
             matches: db.matches(value),
         },
-        None => Resolved {
-            raw,
-            value: None,
-            confidence: digits.iter().map(|r| r.score).fold(f32::INFINITY, f32::min),
-            corrected: false,
-            matches: Vec::new(),
-        },
+        None => {
+            let confidence = digits.iter().map(|r| r.score).fold(f32::INFINITY, f32::min);
+            let text: String = digits.iter().map(|r| r.best).collect();
+            let value = text
+                .parse::<u32>()
+                .ok()
+                .filter(|&v| confidence >= MIXED_MIN_CONFIDENCE && !db.mixes(v).is_empty());
+            Resolved {
+                raw,
+                value,
+                confidence,
+                corrected: false,
+                matches: Vec::new(),
+            }
+        }
     }
 }
 
@@ -155,6 +168,21 @@ mod tests {
         let r = resolve(&reads, &sample_db());
         assert_eq!(r.value, None);
         assert_eq!(r.raw, "16,980");
+    }
+
+    #[test]
+    fn clean_read_of_a_mixed_cluster_resolves() {
+        // 2 Laranite + 3 Copper; no single source explains it.
+        let r = resolve(&clear("20,370"), &sample_db());
+        assert_eq!(r.value, Some(20370));
+        assert!(r.matches.is_empty());
+    }
+
+    #[test]
+    fn unsure_read_of_a_mixed_cluster_is_rejected() {
+        let mut reads = clear("20,370");
+        reads[3] = read('3', 0.7, Some(('8', 0.4)));
+        assert_eq!(resolve(&reads, &sample_db()).value, None);
     }
 
     #[test]

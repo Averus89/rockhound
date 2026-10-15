@@ -10,6 +10,7 @@ const reading = (overrides: Partial<Reading> = {}): Reading => ({
   raw: "12,720",
   confidence: 0.9,
   corrected: false,
+  mixes: [],
   matches: [
     { name: "Copper", category: "ship_mining", tier: "common", base: 4240, count: 3 },
     { name: "Salvage Panels", category: "salvage", tier: null, base: 2120, count: 6 },
@@ -45,6 +46,19 @@ describe("Readout", () => {
   it("says when a value matches nothing", () => {
     show(reading({ matches: [] }));
     expect(screen.getByText("Unknown signature")).toBeTruthy();
+  });
+
+  it("lists the likeliest mixes of a mixed cluster", () => {
+    const mix = (a: string, b: string): Reading["mixes"][number] => [
+      { name: a, category: "ship_mining", tier: "common", base: 4270, count: 2 },
+      { name: b, category: "ship_mining", tier: "common", base: 4285, count: 4 },
+    ];
+    const mixes = ["A", "B", "C", "D", "E"].map((n) => mix(`Iron ${n}`, "Ice"));
+    show(reading({ value: 25680, matches: [], mixes }));
+    expect(screen.getByText("Mixed cluster")).toBeTruthy();
+    expect(screen.getByText("Iron A ×2 + Ice ×4")).toBeTruthy();
+    expect(screen.queryByText("Iron D ×2 + Ice ×4")).toBeNull();
+    expect(screen.getByText("and 2 other mixes")).toBeTruthy();
   });
 
   it("prompts while waiting for a value", () => {

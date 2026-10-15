@@ -61,6 +61,9 @@ pub struct Reading {
     pub confidence: f32,
     pub corrected: bool,
     pub matches: Vec<SignatureMatch>,
+    /// Two-mineral clusters that add up to the value, filled only when no
+    /// single source explains it.
+    pub mixes: Vec<[SignatureMatch; 2]>,
     /// Unix time in milliseconds.
     pub at: u64,
 }
@@ -107,7 +110,11 @@ pub fn spawn(
                     if value != shown {
                         shown = value;
                         let matches = value.map(|v| db.matches(v)).unwrap_or_default();
-                        on_reading(to_reading(value, matches, resolved));
+                        let mixes = match value {
+                            Some(v) if matches.is_empty() => db.mixes(v),
+                            _ => Vec::new(),
+                        };
+                        on_reading(to_reading(value, matches, mixes, resolved));
                     }
                 }
                 Err(e) => {
@@ -125,6 +132,7 @@ pub fn spawn(
 fn to_reading(
     value: Option<u32>,
     matches: Vec<SignatureMatch>,
+    mixes: Vec<[SignatureMatch; 2]>,
     resolved: Option<rockhound_core::Resolved>,
 ) -> Reading {
     let at = SystemTime::now()
@@ -139,6 +147,7 @@ fn to_reading(
         confidence: frame.as_ref().map_or(0.0, |r| r.confidence),
         corrected: frame.as_ref().is_some_and(|r| r.corrected),
         matches,
+        mixes,
         at,
     }
 }
