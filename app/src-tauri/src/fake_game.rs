@@ -92,7 +92,8 @@ impl Video {
 
     fn next_band(&mut self) -> Result<RgbaImage, String> {
         let [x, y, w, h] = self.rect;
-        let mut pixels = vec![0; (w * h * 4) as usize];
+        // In usize: a u32 product overflows for a box over 1 G pixels.
+        let mut pixels = vec![0; w as usize * h as usize * 4];
         // At the end of the video, start it again once; a decoder that
         // can't produce even one frame means the file is unusable.
         for _ in 0..2 {
