@@ -1,5 +1,20 @@
 # Devlog
 
+## 2026-10-15: v0.5.3, steady readout and a smaller search band
+
+Alan's v0.5.2 session: 25,680 showed as a mixed cluster but blinked, and
+the debug crops were full of rocks, stars and OUTPUT labels.
+
+- The vote cleared the value on the first frame that didn't confirm it,
+  and about half the live frames don't (the locator lands on something
+  else). `Voter::hold` keeps a shown value through unconfirmed frames;
+  the app holds it for 3 s. A different value still replaces it as soon
+  as it wins the vote.
+- The search band is now sized in window heights around the centre
+  (0.3 h either side, 0.25 h to 0.5 h down): 864x360 at 5120x1440 instead
+  of 2048x720. The HUD scales with height, so the old band in widths took
+  in most of an ultrawide screen.
+
 ## 2026-10-15: v0.5.2, mixed clusters
 
 Alan chose to show values only a mix of minerals explains (25,680 =

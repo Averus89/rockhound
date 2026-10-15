@@ -104,6 +104,9 @@ pub struct Voter {
     window: VecDeque<Option<u32>>,
     size: usize,
     needed: usize,
+    hold: usize,
+    shown: Option<u32>,
+    misses: usize,
 }
 
 impl Voter {
@@ -113,7 +116,18 @@ impl Voter {
             window: VecDeque::with_capacity(size),
             size,
             needed,
+            hold: 0,
+            shown: None,
+            misses: 0,
         }
+    }
+
+    /// Keep showing a value through up to `frames` frames that don't
+    /// confirm it. Live, the locator often lands on a rock or another label
+    /// for a frame or two, and without this the value blinks off and on.
+    pub fn hold(mut self, frames: usize) -> Self {
+        self.hold = frames;
+        self
     }
 
     pub fn push(&mut self, value: Option<u32>) -> Option<u32> {
@@ -121,6 +135,19 @@ impl Voter {
             self.window.pop_front();
         }
         self.window.push_back(value);
+        if let Some(voted) = self.vote() {
+            self.shown = Some(voted);
+            self.misses = 0;
+        } else if self.shown.is_some() {
+            self.misses += 1;
+            if self.misses > self.hold {
+                self.shown = None;
+            }
+        }
+        self.shown
+    }
+
+    fn vote(&self) -> Option<u32> {
         let latest = self.window.iter().rev().flatten().next()?;
         let agree = self.window.iter().filter(|v| **v == Some(*latest)).count();
         (agree >= self.needed).then_some(*latest)
@@ -192,5 +219,26 @@ mod tests {
         assert_eq!(v.push(Some(16980)), None);
         assert_eq!(v.push(Some(16960)), Some(16960));
         assert_eq!(v.push(None), None);
+    }
+
+    #[test]
+    fn voter_holds_a_value_through_bad_frames() {
+        let mut v = Voter::new(3, 2).hold(3);
+        v.push(Some(25680));
+        assert_eq!(v.push(Some(25680)), Some(25680));
+        // The vote itself survives one bad frame, then the hold takes over.
+        for _ in 0..4 {
+            assert_eq!(v.push(None), Some(25680));
+        }
+        assert_eq!(v.push(None), None);
+    }
+
+    #[test]
+    fn voter_switches_to_a_new_value_at_once() {
+        let mut v = Voter::new(3, 2).hold(10);
+        v.push(Some(25680));
+        v.push(Some(25680));
+        assert_eq!(v.push(Some(16960)), Some(25680));
+        assert_eq!(v.push(Some(16960)), Some(16960));
     }
 }

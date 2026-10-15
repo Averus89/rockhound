@@ -25,23 +25,21 @@ fn is_game_window(title: &str, exe_path: Option<&str>) -> bool {
     exe.is_some_and(|e| e.eq_ignore_ascii_case(GAME_PROCESS)) || title.trim() == GAME_TITLE
 }
 
-/// Part of the game window searched for the readout, as fractions of its
-/// size (x, y, width, height). The readout appears near the crosshair.
-const SEARCH_BAND: [f32; 4] = [0.3, 0.15, 0.4, 0.5];
+/// Part of the game window searched for the readout, in window heights:
+/// half-width either side of the centre, then top and bottom. The readout
+/// sits just above the crosshair (y ~0.35 at 1440p), and the HUD scales
+/// with height, so on ultrawide screens a band in widths took in rocks and
+/// other HUD labels the locator then mistook for the readout.
+const SEARCH_BAND: [f32; 3] = [0.3, 0.25, 0.5];
 
 /// Pixel rectangle (x, y, width, height) of the search band, or of the
 /// player's own region when they set one, clamped to the window.
 #[cfg_attr(not(windows), allow(dead_code))]
 fn capture_rect(width: u32, height: u32, region: Option<[u32; 4]>) -> Option<[u32; 4]> {
     let [x, y, w, h] = region.unwrap_or_else(|| {
-        let [fx, fy, fw, fh] = SEARCH_BAND;
-        let scale = |f: f32, size: u32| (f * size as f32) as u32;
-        [
-            scale(fx, width),
-            scale(fy, height),
-            scale(fw, width),
-            scale(fh, height),
-        ]
+        let [half_width, top, bottom] = SEARCH_BAND.map(|f| (f * height as f32) as u32);
+        let x = (width / 2).saturating_sub(half_width);
+        [x, top, 2 * half_width, bottom - top]
     });
     let (w, h) = (
         w.min(width.saturating_sub(x)),
@@ -240,7 +238,7 @@ mod tests {
 
     #[test]
     fn search_band_is_centred_and_clamped() {
-        assert_eq!(capture_rect(5120, 1440, None), Some([1536, 216, 2048, 720]));
+        assert_eq!(capture_rect(5120, 1440, None), Some([2128, 360, 864, 360]));
         assert_eq!(
             capture_rect(100, 100, Some([90, 90, 50, 50])),
             Some([90, 90, 10, 10])
