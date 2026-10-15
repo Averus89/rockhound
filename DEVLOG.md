@@ -1,5 +1,17 @@
 # Devlog
 
+## 2026-10-15: v0.5.4, review fixes before merging the stack
+
+From CodeRabbit's reviews when PRs #2 to #5 left draft:
+
+- A window titled "Star Citizen" is only taken for the game when its exe
+  path can't be read; a readable path must be StarCitizen.exe.
+- "Save debug images" takes effect when settings are saved, not at the
+  next scan start, so switching it off mid-scan stops the writes.
+- `save_settings` keeps memory in sync with the saved file even when the
+  overlay can't be shown (#4).
+- CI runs with a read-only token that isn't left in the checkout (#3).
+
 ## 2026-10-15: v0.5.3, steady readout and a smaller search band
 
 Alan's v0.5.2 session: 25,680 showed as a mixed cluster but blinked, and

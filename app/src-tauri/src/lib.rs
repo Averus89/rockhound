@@ -82,6 +82,9 @@ fn save_settings(
     settings: Settings,
 ) -> Result<(), String> {
     settings.save(&state.paths.settings)?;
+    // Applied now, not at the next scan start, so switching it off mid-scan
+    // stops the writes.
+    debug::set_dir(settings.debug.then(|| state.paths.debug.clone()));
     // The file is written, so memory must match it even if the overlay
     // can't be shown; otherwise a restart would apply different settings.
     let shown = overlay::set_visible(&app, settings.overlay);

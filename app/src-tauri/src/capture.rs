@@ -22,7 +22,12 @@ const GAME_TITLE: &str = "Star Citizen";
 #[cfg_attr(not(windows), allow(dead_code))]
 fn is_game_window(title: &str, exe_path: Option<&str>) -> bool {
     let exe = exe_path.and_then(|p| p.rsplit(['\\', '/']).next());
-    exe.is_some_and(|e| e.eq_ignore_ascii_case(GAME_PROCESS)) || title.trim() == GAME_TITLE
+    // The title is only a fallback for when anti-cheat hides the exe path;
+    // any other program may use the same title.
+    exe.map_or_else(
+        || title.trim() == GAME_TITLE,
+        |e| e.eq_ignore_ascii_case(GAME_PROCESS),
+    )
 }
 
 /// Part of the game window searched for the readout, in window heights:
@@ -254,6 +259,10 @@ mod tests {
         assert!(is_game_window("Star Citizen ", None));
         assert!(!is_game_window("Star Citizen - Wiki - Firefox", None));
         assert!(!is_game_window("Rockhound", Some(r"C:\rockhound.exe")));
+        assert!(!is_game_window(
+            "Star Citizen",
+            Some(r"C:\Tools\viewer.exe")
+        ));
     }
 
     #[test]
