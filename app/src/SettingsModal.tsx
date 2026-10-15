@@ -1,4 +1,13 @@
-import { Button, Group, Modal, NumberInput, SimpleGrid, Stack, Text } from "@mantine/core";
+import {
+  Button,
+  Group,
+  Modal,
+  NumberInput,
+  SimpleGrid,
+  Stack,
+  Switch,
+  Text,
+} from "@mantine/core";
 import { useEffect, useState } from "react";
 
 import type { Settings } from "./api";
@@ -39,8 +48,21 @@ export function SettingsModal({ opened, settings, onClose, onSave }: Props) {
   return (
     <Modal opened={opened} onClose={onClose} title="Settings" centered>
       <Stack>
+        <Switch
+          label="Find the readout automatically"
+          description="Follows the orange map pin. Turn off to set a fixed box."
+          checked={draft.region === null}
+          onChange={(e) =>
+            setDraft({
+              ...draft,
+              region: e.currentTarget.checked
+                ? null
+                : (settings.region ?? [0, 0, 0, 0]),
+            })
+          }
+        />
         <Text size="sm" c="dimmed">
-          Readout box in game-window pixels, just right of the orange map pin.
+          Fixed readout box in game-window pixels, just right of the pin.
         </Text>
         <SimpleGrid cols={2}>
           {REGION_FIELDS.map((label, i) => (
@@ -48,6 +70,7 @@ export function SettingsModal({ opened, settings, onClose, onSave }: Props) {
               key={label}
               label={label}
               min={0}
+              disabled={draft.region === null}
               value={region[i]}
               onChange={(v) => setRegion(i, Number(v) || 0)}
             />

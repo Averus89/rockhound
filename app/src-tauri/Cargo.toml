@@ -21,3 +21,13 @@ serde.workspace = true
 serde_json.workspace = true
 tauri = { version = "2", features = [] }
 ureq = "3"
+
+[target.'cfg(windows)'.dependencies]
+windows-capture = "2.0.1"
+windows = { version = "0.62.2", features = [
+    "Foundation",
+    "Graphics_Imaging",
+    "Media_Ocr",
+    "Storage_Streams",
+    "Win32_System_WinRT",
+] }

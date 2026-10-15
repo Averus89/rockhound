@@ -7,22 +7,18 @@
 
 mod labels;
 
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{Duration, Instant};
 
 use anyhow::{bail, ensure, Context, Result};
 use clap::{Parser, Subcommand};
-use image::imageops;
-use rockhound_core::{preprocess, read_crop, segment, SignatureDb, TemplateSet, Voter};
+use rockhound_core::{layout, learn_crop, preprocess, read_crop, SignatureDb, TemplateSet, Voter};
 
 use crate::labels::Labels;
 
 /// File inside a frames directory recording the extraction rate.
 const FPS_FILE: &str = "fps.txt";
-/// Cap on stored samples per digit; more adds time without adding accuracy.
-const MAX_SAMPLES_PER_DIGIT: usize = 12;
 
 #[derive(Parser)]
 #[command(version, about)]
@@ -33,6 +29,13 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Cmd {
+    /// Show how one crop is cleaned up and split, for tuning.
+    Inspect {
+        crop: PathBuf,
+        /// Where to write the normalized image with glyph boxes drawn in.
+        #[arg(long)]
+        out: PathBuf,
+    },
     /// Extract readout crops from a video with ffmpeg.
     Frames {
         video: PathBuf,
@@ -80,6 +83,7 @@ fn main() -> Result<()> {
             labels,
             out,
         } => learn(&frames, &labels, &out),
+        Cmd::Inspect { crop, out } => inspect(&crop, &out),
         Cmd::Eval {
             frames,
             labels,
@@ -137,6 +141,25 @@ fn list_frames(dir: &Path) -> Result<Vec<(f64, PathBuf)>> {
     Ok(frames)
 }
 
+fn inspect(crop: &Path, out: &Path) -> Result<()> {
+    let rgba = image::open(crop)?.to_rgba8();
+    let gray = preprocess::normalize(&rgba);
+    let mut marked = image::DynamicImage::ImageLuma8(gray.clone()).to_rgb8();
+    match layout::find_line(&rgba, &gray) {
+        Some(line) => {
+            for x in line.x..line.x + line.width {
+                marked.put_pixel(x, line.y, image::Rgb([255, 80, 0]));
+                marked.put_pixel(x, line.y + line.height - 1, image::Rgb([255, 80, 0]));
+            }
+            println!("{line:?}");
+        }
+        None => println!("no digit line found"),
+    }
+    marked.save(out)?;
+    println!("image written to {}", out.display());
+    Ok(())
+}
+
 fn load_labels(path: &Path) -> Result<Labels> {
     let text =
         std::fs::read_to_string(path).with_context(|| format!("reading {}", path.display()))?;
@@ -145,43 +168,28 @@ fn load_labels(path: &Path) -> Result<Labels> {
 
 fn learn(frames_dir: &Path, labels: &Path, out: &Path) -> Result<()> {
     let labels = load_labels(labels)?;
-    std::fs::create_dir_all(out)?;
-    let mut counts: HashMap<char, usize> = HashMap::new();
-    let mut skipped = 0;
+    let mut templates = TemplateSet::default();
+    let (mut used, mut skipped) = (0, 0);
     for (t, path) in list_frames(frames_dir)? {
         let Some(Some(value)) = labels.at(t) else {
             continue;
         };
-        let gray = preprocess::normalize(&image::open(&path)?.to_rgba8());
-        let digits: Vec<_> = segment::segment(&gray)
-            .into_iter()
-            .filter(|b| !b.is_separator)
-            .collect();
-        let expected: Vec<char> = value.to_string().chars().collect();
-        if digits.len() != expected.len() {
-            // Segmentation disagrees with the label; don't learn from it.
+        let crop = image::open(&path)?.to_rgba8();
+        // A crop that doesn't split into the label's cells is skipped rather
+        // than learned wrong.
+        if learn_crop(&crop, value, &mut templates) > 0 {
+            used += 1;
+        } else {
             skipped += 1;
-            continue;
-        }
-        let stem = path.file_stem().unwrap_or_default().to_string_lossy();
-        for (i, (b, digit)) in digits.iter().zip(&expected).enumerate() {
-            let n = counts.entry(*digit).or_default();
-            if *n >= MAX_SAMPLES_PER_DIGIT {
-                continue;
-            }
-            *n += 1;
-            let glyph = imageops::crop_imm(&gray, b.x, b.y, b.width, b.height).to_image();
-            glyph.save(out.join(format!("{digit}_{stem}_{i}.png")))?;
         }
     }
-    let mut summary: Vec<_> = counts.into_iter().collect();
-    summary.sort();
+    templates.save_dir(out)?;
     println!(
-        "templates per digit: {summary:?} (skipped {skipped} frames that didn't segment cleanly)"
+        "{} templates from {used} frames ({skipped} added nothing), written to {}",
+        templates.len(),
+        out.display()
     );
-    let missing: Vec<char> = ('0'..='9')
-        .filter(|d| !summary.iter().any(|(c, _)| c == d))
-        .collect();
+    let missing = templates.missing_digits();
     if !missing.is_empty() {
         println!("warning: no samples for {missing:?}; label more frames that show them");
     }
