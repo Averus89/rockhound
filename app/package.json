@@ -29,7 +29,7 @@
     "postcss": "^8",
     "postcss-preset-mantine": "^1",
     "postcss-simple-vars": "^7",
-    "typescript": "^5.9",
+    "typescript": "^7.0",
     "vite": "^8.3.4",
     "vitest": "^5.0.4"
   }
