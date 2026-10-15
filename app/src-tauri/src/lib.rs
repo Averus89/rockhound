@@ -79,9 +79,11 @@ fn save_settings(
     settings: Settings,
 ) -> Result<(), String> {
     settings.save(&state.paths.settings)?;
-    overlay::set_visible(&app, settings.overlay)?;
+    // The file is written, so memory must match it even if the overlay
+    // can't be shown; otherwise a restart would apply different settings.
+    let shown = overlay::set_visible(&app, settings.overlay);
     *lock(&state.settings) = settings;
-    Ok(())
+    shown
 }
 
 #[tauri::command]
