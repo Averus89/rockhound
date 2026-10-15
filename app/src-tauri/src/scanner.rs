@@ -28,28 +28,41 @@ pub struct ReplaySource {
 
 impl ReplaySource {
     pub fn open(dir: &Path) -> Result<Self, String> {
-        let mut frames: Vec<PathBuf> = std::fs::read_dir(dir)
-            .map_err(|e| format!("cannot open replay folder {}: {e}", dir.display()))?
-            .flatten()
-            .map(|e| e.path())
-            .filter(|p| p.extension().is_some_and(|e| e == "png"))
-            .collect();
-        if frames.is_empty() {
-            return Err(format!("no PNG frames in {}", dir.display()));
-        }
-        frames.sort();
-        Ok(Self { frames, next: 0 })
+        Ok(Self {
+            frames: list_pngs(dir)?,
+            next: 0,
+        })
     }
 }
 
 impl FrameSource for ReplaySource {
     fn next_crop(&mut self) -> Result<Option<RgbaImage>, String> {
-        let path = &self.frames[self.next];
-        self.next = (self.next + 1) % self.frames.len();
-        image::open(path)
-            .map(|img| Some(img.to_rgba8()))
-            .map_err(|e| format!("cannot read {}: {e}", path.display()))
+        next_png(&self.frames, &mut self.next).map(Some)
     }
+}
+
+/// The PNG files in `dir`, in name order; an error when there are none.
+pub fn list_pngs(dir: &Path) -> Result<Vec<PathBuf>, String> {
+    let mut frames: Vec<PathBuf> = std::fs::read_dir(dir)
+        .map_err(|e| format!("cannot open frame folder {}: {e}", dir.display()))?
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| p.extension().is_some_and(|e| e == "png"))
+        .collect();
+    if frames.is_empty() {
+        return Err(format!("no PNG frames in {}", dir.display()));
+    }
+    frames.sort();
+    Ok(frames)
+}
+
+/// Load `frames[*next]` and advance, looping back to the first frame.
+pub fn next_png(frames: &[PathBuf], next: &mut usize) -> Result<RgbaImage, String> {
+    let path = &frames[*next];
+    *next = (*next + 1) % frames.len();
+    image::open(path)
+        .map(|img| img.to_rgba8())
+        .map_err(|e| format!("cannot read {}: {e}", path.display()))
 }
 
 /// How long a shown value stays up while frames stop confirming it.
