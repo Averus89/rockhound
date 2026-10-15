@@ -9,35 +9,77 @@
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
-use image::RgbaImage;
-use rockhound_core::{hud_format, learn_crop, read_crop, Resolved, SignatureDb, TemplateSet};
+use image::{imageops, GrayImage, Luma, RgbaImage};
+use rockhound_core::preprocess::otsu;
+use rockhound_core::{
+    crop_line, hud_format, learn_crop, read_crop, Resolved, SignatureDb, TemplateSet,
+};
+
+use crate::debug;
 
 /// OCR is slow (tens of ms) so it runs at most this often.
 const TEACHER_INTERVAL: Duration = Duration::from_millis(1000);
 
 /// A slower reader whose text is trusted to teach templates.
 pub trait Teacher: Send {
-    /// Text read from a readout crop, as written on screen.
-    fn read_text(&mut self, crop: &RgbaImage) -> Option<String>;
+    /// Text read from [`teacher_input`]: dark digits on white.
+    fn read_text(&mut self, line: &GrayImage) -> Option<String>;
+}
+
+/// Scale of the digit line handed to the teacher, over the template line
+/// height (48 px, already well over the ~20 px OCR engines want).
+const TEACHER_SCALE: u32 = 1;
+/// White margin around it, in pixels; OCR misses text touching the edge.
+const TEACHER_MARGIN: u32 = 24;
+
+/// The readout's digit line cleaned up for OCR: only the digits (no pin or
+/// box), thresholded so the colour fringes are gone, dark on white, larger
+/// and with a margin.
+pub fn teacher_input(crop: &RgbaImage) -> Option<GrayImage> {
+    let line = crop_line(crop)?;
+    let threshold = otsu(&line);
+    let (w, h) = (line.width() * TEACHER_SCALE, line.height() * TEACHER_SCALE);
+    let big = imageops::resize(&line, w, h, imageops::FilterType::Triangle);
+    let mut out =
+        GrayImage::from_pixel(w + 2 * TEACHER_MARGIN, h + 2 * TEACHER_MARGIN, Luma([255]));
+    for (x, y, p) in big.enumerate_pixels() {
+        let ink = p.0[0] > threshold;
+        out.put_pixel(
+            x + TEACHER_MARGIN,
+            y + TEACHER_MARGIN,
+            Luma([if ink { 0 } else { 255 }]),
+        );
+    }
+    Some(out)
 }
 
 pub struct Reader {
+    /// Shipped templates followed by the player's learned ones.
     templates: TemplateSet,
+    /// How many of `templates` are shipped; only the rest are saved.
+    base_len: usize,
     /// Where learned templates are saved; `None` keeps them in memory.
     template_dir: Option<PathBuf>,
     teacher: Option<Box<dyn Teacher>>,
     last_taught: Option<Instant>,
+    /// Last table-valid teacher read, kept across failed reads: OCR often
+    /// returns nothing, and two good reads rarely come back to back.
     last_teacher_value: Option<u32>,
 }
 
 impl Reader {
     pub fn new(
-        templates: TemplateSet,
+        base: TemplateSet,
+        learned: TemplateSet,
         template_dir: Option<PathBuf>,
         teacher: Option<Box<dyn Teacher>>,
     ) -> Self {
+        let base_len = base.len();
+        let mut templates = base;
+        templates.extend(learned);
         Self {
             templates,
+            base_len,
             template_dir,
             teacher,
             last_taught: None,
@@ -52,8 +94,10 @@ impl Reader {
             return resolved;
         }
         let taught = self.ask_teacher(crop, db);
-        resolved.or_else(|| {
-            taught.map(|value| Resolved {
+        // While templates are incomplete a missing digit is read as its
+        // closest lookalike, so the teacher's answer wins when there is one.
+        taught
+            .map(|value| Resolved {
                 raw: hud_format(value),
                 value: Some(value),
                 // OCR gives no per-glyph scores.
@@ -61,7 +105,7 @@ impl Reader {
                 corrected: false,
                 matches: db.matches(value),
             })
-        })
+            .or(resolved)
     }
 
     /// Ask the teacher (throttled) and learn from its answer when it is
@@ -76,24 +120,36 @@ impl Reader {
             return None;
         }
         self.last_taught = Some(Instant::now());
-        let value = teacher
-            .read_text(crop)
-            .and_then(|text| parse_value(&text))
+        let input = teacher_input(crop)?;
+        let text = teacher.read_text(&input);
+        let value = text
+            .as_deref()
+            .and_then(parse_value)
             .filter(|v| db.is_valid(*v));
-        let confirmed = value.is_some() && value == self.last_teacher_value;
-        self.last_teacher_value = value;
-        if confirmed {
-            let v = value?;
-            if learn_crop(crop, v, &mut self.templates) > 0 {
-                self.save_templates();
-            }
+        if debug::enabled() {
+            debug::image(
+                "ocr-input",
+                &image::DynamicImage::ImageLuma8(input).to_rgba8(),
+            );
+            debug::note(format_args!(
+                "OCR {text:?} -> {value:?}; templates read {:?}, missing {:?}",
+                read_crop(crop, &self.templates, db).map(|r| r.raw),
+                self.templates.missing_digits()
+            ));
+        }
+        let v = value?;
+        let confirmed = self.last_teacher_value == Some(v);
+        self.last_teacher_value = Some(v);
+        if confirmed && learn_crop(crop, v, &mut self.templates) > 0 {
+            debug::note(format_args!("learned from {v}"));
+            self.save_templates();
         }
         value
     }
 
     fn save_templates(&self) {
         if let Some(dir) = &self.template_dir {
-            if let Err(e) = self.templates.save_dir(dir) {
+            if let Err(e) = self.templates.tail(self.base_len).save_dir(dir) {
                 // Learning still helps this session; it just won't persist.
                 eprintln!("{e}");
             }
@@ -143,7 +199,7 @@ mod tests {
     struct FixedTeacher(&'static str);
 
     impl Teacher for FixedTeacher {
-        fn read_text(&mut self, _crop: &RgbaImage) -> Option<String> {
+        fn read_text(&mut self, _line: &GrayImage) -> Option<String> {
             Some(self.0.to_string())
         }
     }
@@ -151,6 +207,7 @@ mod tests {
     #[test]
     fn teacher_reads_until_templates_learn() {
         let mut reader = Reader::new(
+            TemplateSet::default(),
             TemplateSet::default(),
             None,
             Some(Box::new(FixedTeacher("17,2OO"))),
@@ -168,7 +225,8 @@ mod tests {
         assert!(!reader.templates.is_empty(), "two agreeing reads teach");
 
         // Templates alone now read the other frame.
-        let mut templates_only = Reader::new(reader.templates.clone(), None, None);
+        let mut templates_only =
+            Reader::new(reader.templates.clone(), TemplateSet::default(), None, None);
         let read = templates_only.read(&fixture("hud_17200_pin.png"), &db());
         assert_eq!(read.and_then(|r| r.value), Some(17200));
     }
@@ -177,10 +235,56 @@ mod tests {
     fn teacher_values_the_table_cant_explain_are_ignored() {
         let mut reader = Reader::new(
             TemplateSet::default(),
+            TemplateSet::default(),
             None,
             Some(Box::new(FixedTeacher("17,201"))),
         );
         assert!(reader.read(&fixture("hud_17200.png"), &db()).is_none());
+    }
+
+    #[test]
+    fn teacher_reads_need_not_be_back_to_back() {
+        struct Flaky(usize);
+        impl Teacher for Flaky {
+            fn read_text(&mut self, _line: &GrayImage) -> Option<String> {
+                self.0 += 1;
+                // Every other OCR read comes back empty.
+                Some(
+                    if self.0.is_multiple_of(2) {
+                        ""
+                    } else {
+                        "17,200"
+                    }
+                    .to_string(),
+                )
+            }
+        }
+        let mut reader = Reader::new(
+            TemplateSet::default(),
+            TemplateSet::default(),
+            None,
+            Some(Box::new(Flaky(0))),
+        );
+        let crop = fixture("hud_17200.png");
+        for _ in 0..3 {
+            reader.last_taught = None;
+            reader.read(&crop, &db());
+        }
+        assert!(!reader.templates.is_empty());
+    }
+
+    #[test]
+    fn teacher_input_is_dark_digits_on_white_with_a_margin() {
+        let input = teacher_input(&fixture("hud_17200_pin.png")).unwrap();
+        assert_eq!(
+            input.height(),
+            rockhound_core::recognize::LINE_HEIGHT * TEACHER_SCALE + 2 * TEACHER_MARGIN
+        );
+        assert!(input.pixels().all(|p| p.0[0] == 0 || p.0[0] == 255));
+        let dark = input.pixels().filter(|p| p.0[0] == 0).count();
+        assert!(dark > 0 && dark * 3 < input.pixels().len(), "{dark}");
+        // Margin rows are blank.
+        assert!((0..input.width()).all(|x| input.get_pixel(x, 0).0[0] == 255));
     }
 
     #[test]

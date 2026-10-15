@@ -52,6 +52,9 @@ impl FrameSource for ReplaySource {
     }
 }
 
+/// How long a shown value stays up while frames stop confirming it.
+const SHOW_HOLD: Duration = Duration::from_secs(3);
+
 /// Sent to the UI whenever the shown value changes.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -61,6 +64,9 @@ pub struct Reading {
     pub confidence: f32,
     pub corrected: bool,
     pub matches: Vec<SignatureMatch>,
+    /// Two-mineral clusters that add up to the value, filled only when no
+    /// single source explains it.
+    pub mixes: Vec<[SignatureMatch; 2]>,
     /// Unix time in milliseconds.
     pub at: u64,
 }
@@ -95,7 +101,8 @@ pub fn spawn(
     let stop = Arc::new(AtomicBool::new(false));
     let stop_flag = Arc::clone(&stop);
     let thread = std::thread::spawn(move || {
-        let mut voter = Voter::new(3, 2);
+        let hold = (SHOW_HOLD.as_millis() / interval.as_millis().max(1)) as usize;
+        let mut voter = Voter::new(3, 2).hold(hold);
         let mut shown: Option<u32> = None;
         let mut error = None;
         while !stop_flag.load(Ordering::Relaxed) {
@@ -107,7 +114,11 @@ pub fn spawn(
                     if value != shown {
                         shown = value;
                         let matches = value.map(|v| db.matches(v)).unwrap_or_default();
-                        on_reading(to_reading(value, matches, resolved));
+                        let mixes = match value {
+                            Some(v) if matches.is_empty() => db.mixes(v),
+                            _ => Vec::new(),
+                        };
+                        on_reading(to_reading(value, matches, mixes, resolved));
                     }
                 }
                 Err(e) => {
@@ -125,6 +136,7 @@ pub fn spawn(
 fn to_reading(
     value: Option<u32>,
     matches: Vec<SignatureMatch>,
+    mixes: Vec<[SignatureMatch; 2]>,
     resolved: Option<rockhound_core::Resolved>,
 ) -> Reading {
     let at = SystemTime::now()
@@ -139,6 +151,7 @@ fn to_reading(
         confidence: frame.as_ref().map_or(0.0, |r| r.confidence),
         corrected: frame.as_ref().is_some_and(|r| r.corrected),
         matches,
+        mixes,
         at,
     }
 }
@@ -182,7 +195,7 @@ mod tests {
         let (stopped, got_stop) = mpsc::channel();
         let handle = spawn(
             Box::new(Frames(3)),
-            Reader::new(templates, None, None),
+            Reader::new(templates, TemplateSet::default(), None, None),
             Arc::new(RwLock::new(db)),
             Duration::from_millis(1),
             move |r| readings.send(r).unwrap(),

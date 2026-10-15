@@ -3,16 +3,13 @@
 //! Too slow and too unsure of itself for every frame, but it needs no
 //! training, which is exactly what a fresh install lacks.
 
-use image::{imageops, RgbaImage};
+use image::GrayImage;
 use windows::Graphics::Imaging::{BitmapPixelFormat, SoftwareBitmap};
 use windows::Media::Ocr::OcrEngine;
 use windows::Storage::Streams::DataWriter;
 use windows::Win32::System::WinRT::{RoInitialize, RO_INIT_MULTITHREADED};
 
 use crate::reader::Teacher;
-
-/// Windows OCR misses text much under ~20 px tall; HUD digits are ~11 px.
-const UPSCALE: u32 = 4;
 
 #[derive(Default)]
 pub struct WindowsOcr {
@@ -31,13 +28,9 @@ impl WindowsOcr {
         Ok(self.engine.as_ref().expect("engine set above"))
     }
 
-    fn recognize(&mut self, crop: &RgbaImage) -> windows::core::Result<String> {
-        // Dark text on white, larger: the input OCR engines are tuned for.
-        let mut gray = rockhound_core::preprocess::normalize(crop);
-        imageops::invert(&mut gray);
-        let (w, h) = (gray.width() * UPSCALE, gray.height() * UPSCALE);
-        let big = imageops::resize(&gray, w, h, imageops::FilterType::Triangle);
-        let bgra: Vec<u8> = big
+    fn recognize(&mut self, line: &GrayImage) -> windows::core::Result<String> {
+        let (w, h) = line.dimensions();
+        let bgra: Vec<u8> = line
             .pixels()
             .flat_map(|p| [p.0[0], p.0[0], p.0[0], 255])
             .collect();
@@ -56,8 +49,8 @@ impl WindowsOcr {
 }
 
 impl Teacher for WindowsOcr {
-    fn read_text(&mut self, crop: &RgbaImage) -> Option<String> {
-        self.recognize(crop)
+    fn read_text(&mut self, line: &GrayImage) -> Option<String> {
+        self.recognize(line)
             .inspect_err(|e| eprintln!("Windows OCR failed: {e}"))
             .ok()
     }

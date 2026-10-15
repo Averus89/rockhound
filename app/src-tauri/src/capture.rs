@@ -8,27 +8,43 @@
 use image::{imageops, RgbaImage};
 use rockhound_core::locate;
 
+use crate::debug;
+
 /// Process whose window is captured.
 #[cfg_attr(not(windows), allow(dead_code))]
 const GAME_PROCESS: &str = "StarCitizen.exe";
+/// Title of the game window, used when the process can't be inspected.
+#[cfg_attr(not(windows), allow(dead_code))]
+const GAME_TITLE: &str = "Star Citizen";
 
-/// Part of the game window searched for the readout, as fractions of its
-/// size (x, y, width, height). The readout appears near the crosshair.
-const SEARCH_BAND: [f32; 4] = [0.3, 0.15, 0.4, 0.5];
+/// Whether a window with `title`, owned by the executable at `exe_path`
+/// (when it could be read), is the game.
+#[cfg_attr(not(windows), allow(dead_code))]
+fn is_game_window(title: &str, exe_path: Option<&str>) -> bool {
+    let exe = exe_path.and_then(|p| p.rsplit(['\\', '/']).next());
+    // The title is only a fallback for when anti-cheat hides the exe path;
+    // any other program may use the same title.
+    exe.map_or_else(
+        || title.trim() == GAME_TITLE,
+        |e| e.eq_ignore_ascii_case(GAME_PROCESS),
+    )
+}
+
+/// Part of the game window searched for the readout, in window heights:
+/// half-width either side of the centre, then top and bottom. The readout
+/// sits just above the crosshair (y ~0.35 at 1440p), and the HUD scales
+/// with height, so on ultrawide screens a band in widths took in rocks and
+/// other HUD labels the locator then mistook for the readout.
+const SEARCH_BAND: [f32; 3] = [0.3, 0.25, 0.5];
 
 /// Pixel rectangle (x, y, width, height) of the search band, or of the
 /// player's own region when they set one, clamped to the window.
 #[cfg_attr(not(windows), allow(dead_code))]
 fn capture_rect(width: u32, height: u32, region: Option<[u32; 4]>) -> Option<[u32; 4]> {
     let [x, y, w, h] = region.unwrap_or_else(|| {
-        let [fx, fy, fw, fh] = SEARCH_BAND;
-        let scale = |f: f32, size: u32| (f * size as f32) as u32;
-        [
-            scale(fx, width),
-            scale(fy, height),
-            scale(fw, width),
-            scale(fh, height),
-        ]
+        let [half_width, top, bottom] = SEARCH_BAND.map(|f| (f * height as f32) as u32);
+        let x = (width / 2).saturating_sub(half_width);
+        [x, top, 2 * half_width, bottom - top]
     });
     let (w, h) = (
         w.min(width.saturating_sub(x)),
@@ -40,12 +56,29 @@ fn capture_rect(width: u32, height: u32, region: Option<[u32; 4]>) -> Option<[u3
 /// The readout crop inside a captured band, or `None` when it isn't on
 /// screen. A player-set region is used as is.
 #[cfg_attr(not(windows), allow(dead_code))]
-fn readout_crop(band: &RgbaImage, manual_region: bool) -> Option<RgbaImage> {
+fn readout_crop(
+    band: &RgbaImage,
+    manual_region: bool,
+    snapshot: &mut debug::Throttle,
+) -> Option<RgbaImage> {
+    let save = snapshot.due();
+    if save {
+        debug::image("band", band);
+    }
     if manual_region {
         return Some(band.clone());
     }
-    let r = locate::find_readout(band)?;
-    Some(imageops::crop_imm(band, r.x, r.y, r.width, r.height).to_image())
+    let found = locate::find_readout(band);
+    let crop = found.map(|r| imageops::crop_imm(band, r.x, r.y, r.width, r.height).to_image());
+    if save {
+        let sample = crop.as_ref().and_then(debug::sample);
+        debug::note(format_args!(
+            "band {}x{}, readout {found:?}, sample {sample:?}",
+            band.width(),
+            band.height()
+        ));
+    }
+    crop
 }
 
 #[cfg(windows)]
@@ -57,6 +90,12 @@ mod wgc {
     use std::time::Duration;
 
     use image::RgbaImage;
+    use windows::core::PWSTR;
+    use windows::Win32::Foundation::CloseHandle;
+    use windows::Win32::System::Threading::{
+        OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32,
+        PROCESS_QUERY_LIMITED_INFORMATION,
+    };
     use windows_capture::capture::{CaptureControl, Context, GraphicsCaptureApiHandler};
     use windows_capture::frame::Frame;
     use windows_capture::graphics_capture_api::InternalCaptureControl;
@@ -66,7 +105,7 @@ mod wgc {
     };
     use windows_capture::window::Window;
 
-    use super::{capture_rect, readout_crop, GAME_PROCESS};
+    use super::{capture_rect, debug, is_game_window, readout_crop};
     use crate::scanner::FrameSource;
 
     type Latest = Arc<Mutex<Option<RgbaImage>>>;
@@ -110,10 +149,32 @@ mod wgc {
         }
     }
 
+    /// Path of the executable that owns `window`. Asks only for limited
+    /// query rights: Easy Anti-Cheat denies the memory-read access that
+    /// `Window::process_name` needs, which hid the game entirely.
+    fn exe_path(window: &Window) -> Option<String> {
+        let pid = window.process_id().ok()?;
+        let process = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid) }.ok()?;
+        let mut buf = [0u16; 1024];
+        let mut len = buf.len() as u32;
+        let ok = unsafe {
+            QueryFullProcessImageNameW(
+                process,
+                PROCESS_NAME_WIN32,
+                PWSTR(buf.as_mut_ptr()),
+                &mut len,
+            )
+        };
+        let _ = unsafe { CloseHandle(process) };
+        ok.ok()?;
+        Some(String::from_utf16_lossy(&buf[..len as usize]))
+    }
+
     /// Frames from the running game.
     pub struct LiveSource {
         latest: Latest,
         manual_region: bool,
+        snapshot: debug::Throttle,
         control: Option<CaptureControl<Handler, String>>,
     }
 
@@ -123,8 +184,8 @@ mod wgc {
                 .map_err(|e| format!("cannot list windows: {e}"))?
                 .into_iter()
                 .find(|w| {
-                    w.process_name()
-                        .is_ok_and(|n| n.eq_ignore_ascii_case(GAME_PROCESS))
+                    w.is_valid()
+                        && is_game_window(&w.title().unwrap_or_default(), exe_path(w).as_deref())
                 })
                 .ok_or("Star Citizen isn't running. Start the game, then press Start.")?;
             let latest = Latest::default();
@@ -144,6 +205,7 @@ mod wgc {
             Ok(Self {
                 latest,
                 manual_region: region.is_some(),
+                snapshot: debug::Throttle::default(),
                 control: Some(control),
             })
         }
@@ -155,9 +217,13 @@ mod wgc {
                 return Err("Star Citizen was closed.".into());
             }
             let latest = self.latest.lock().unwrap_or_else(|e| e.into_inner());
-            Ok(latest
-                .as_ref()
-                .and_then(|band| readout_crop(band, self.manual_region)))
+            let Some(band) = latest.as_ref() else {
+                if self.snapshot.due() {
+                    debug::note("no frame from the game window yet");
+                }
+                return Ok(None);
+            };
+            Ok(readout_crop(band, self.manual_region, &mut self.snapshot))
         }
     }
 
@@ -177,7 +243,7 @@ mod tests {
 
     #[test]
     fn search_band_is_centred_and_clamped() {
-        assert_eq!(capture_rect(5120, 1440, None), Some([1536, 216, 2048, 720]));
+        assert_eq!(capture_rect(5120, 1440, None), Some([2128, 360, 864, 360]));
         assert_eq!(
             capture_rect(100, 100, Some([90, 90, 50, 50])),
             Some([90, 90, 10, 10])
@@ -186,9 +252,24 @@ mod tests {
     }
 
     #[test]
+    fn recognises_the_game_window() {
+        let exe = r"C:\Games\StarCitizen\LIVE\Bin64\StarCitizen.exe";
+        assert!(is_game_window("whatever", Some(exe)));
+        // Process unreadable: fall back to the window title.
+        assert!(is_game_window("Star Citizen ", None));
+        assert!(!is_game_window("Star Citizen - Wiki - Firefox", None));
+        assert!(!is_game_window("Rockhound", Some(r"C:\rockhound.exe")));
+        assert!(!is_game_window(
+            "Star Citizen",
+            Some(r"C:\Tools\viewer.exe")
+        ));
+    }
+
+    #[test]
     fn blank_band_has_no_readout() {
         let band = RgbaImage::from_pixel(300, 100, image::Rgba([10, 10, 10, 255]));
-        assert!(readout_crop(&band, false).is_none());
-        assert!(readout_crop(&band, true).is_some());
+        let mut snapshot = debug::Throttle::default();
+        assert!(readout_crop(&band, false, &mut snapshot).is_none());
+        assert!(readout_crop(&band, true, &mut snapshot).is_some());
     }
 }
