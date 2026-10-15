@@ -1,5 +1,19 @@
 # Devlog
 
+## 2026-10-15: v0.4.4, readout not found with colour fringing
+
+- Alan's live session (21,500 on screen) never located the readout. The
+  game's chromatic aberration paints the white digits in alternating
+  blue, green and orange columns, so per-pixel saturation called them
+  "coloured art" and dropped them with the pin. Text vs pin is now decided
+  by the saturation of a cluster's mean colour: the fringes average back to
+  white, the pin stays orange. New fixture `hud_band_21500.png` and test.
+- While templates are incomplete, the OCR teacher's answer is shown in
+  preference to the template read (a missing 5 was read as 0).
+- Settings: "Save debug images". While scanning, every 2 s it saves the
+  captured band and the located readout, plus a log of locator and OCR
+  results, to `%APPDATA%\io.github.averus89.rockhound\debug`.
+
 ## 2026-10-15: v0.4.3, "state not managed" on startup
 
 - Tauri builds the configured windows before the setup hook runs, so on

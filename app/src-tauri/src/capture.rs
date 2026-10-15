@@ -8,6 +8,8 @@
 use image::{imageops, RgbaImage};
 use rockhound_core::locate;
 
+use crate::debug;
+
 /// Process whose window is captured.
 #[cfg_attr(not(windows), allow(dead_code))]
 const GAME_PROCESS: &str = "StarCitizen.exe";
@@ -51,12 +53,31 @@ fn capture_rect(width: u32, height: u32, region: Option<[u32; 4]>) -> Option<[u3
 /// The readout crop inside a captured band, or `None` when it isn't on
 /// screen. A player-set region is used as is.
 #[cfg_attr(not(windows), allow(dead_code))]
-fn readout_crop(band: &RgbaImage, manual_region: bool) -> Option<RgbaImage> {
+fn readout_crop(
+    band: &RgbaImage,
+    manual_region: bool,
+    snapshot: &mut debug::Throttle,
+) -> Option<RgbaImage> {
+    let save = snapshot.due();
+    if save {
+        debug::image("band", band);
+    }
     if manual_region {
         return Some(band.clone());
     }
-    let r = locate::find_readout(band)?;
-    Some(imageops::crop_imm(band, r.x, r.y, r.width, r.height).to_image())
+    let found = locate::find_readout(band);
+    let crop = found.map(|r| imageops::crop_imm(band, r.x, r.y, r.width, r.height).to_image());
+    if save {
+        debug::note(format_args!(
+            "band {}x{}, readout {found:?}",
+            band.width(),
+            band.height()
+        ));
+        if let Some(c) = &crop {
+            debug::image("readout", c);
+        }
+    }
+    crop
 }
 
 #[cfg(windows)]
@@ -83,7 +104,7 @@ mod wgc {
     };
     use windows_capture::window::Window;
 
-    use super::{capture_rect, is_game_window, readout_crop};
+    use super::{capture_rect, debug, is_game_window, readout_crop};
     use crate::scanner::FrameSource;
 
     type Latest = Arc<Mutex<Option<RgbaImage>>>;
@@ -152,6 +173,7 @@ mod wgc {
     pub struct LiveSource {
         latest: Latest,
         manual_region: bool,
+        snapshot: debug::Throttle,
         control: Option<CaptureControl<Handler, String>>,
     }
 
@@ -182,6 +204,7 @@ mod wgc {
             Ok(Self {
                 latest,
                 manual_region: region.is_some(),
+                snapshot: debug::Throttle::default(),
                 control: Some(control),
             })
         }
@@ -193,9 +216,13 @@ mod wgc {
                 return Err("Star Citizen was closed.".into());
             }
             let latest = self.latest.lock().unwrap_or_else(|e| e.into_inner());
-            Ok(latest
-                .as_ref()
-                .and_then(|band| readout_crop(band, self.manual_region)))
+            let Some(band) = latest.as_ref() else {
+                if self.snapshot.due() {
+                    debug::note("no frame from the game window yet");
+                }
+                return Ok(None);
+            };
+            Ok(readout_crop(band, self.manual_region, &mut self.snapshot))
         }
     }
 
@@ -236,7 +263,8 @@ mod tests {
     #[test]
     fn blank_band_has_no_readout() {
         let band = RgbaImage::from_pixel(300, 100, image::Rgba([10, 10, 10, 255]));
-        assert!(readout_crop(&band, false).is_none());
-        assert!(readout_crop(&band, true).is_some());
+        let mut snapshot = debug::Throttle::default();
+        assert!(readout_crop(&band, false, &mut snapshot).is_none());
+        assert!(readout_crop(&band, true, &mut snapshot).is_some());
     }
 }

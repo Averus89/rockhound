@@ -6,6 +6,7 @@
 //! - `signatures-updated`: a newer signature table was synced.
 
 mod capture;
+mod debug;
 #[cfg(windows)]
 mod ocr;
 mod overlay;
@@ -35,6 +36,8 @@ struct Paths {
     settings: PathBuf,
     signature_cache: PathBuf,
     templates: PathBuf,
+    /// Diagnostics, when the player turns them on.
+    debug: PathBuf,
 }
 
 struct AppState {
@@ -92,6 +95,10 @@ fn start_scan(app: AppHandle, state: State<'_, AppState>) -> Result<(), String> 
     }
     let reader = open_reader(&state.paths.templates)?;
     let settings = lock(&state.settings).clone();
+    debug::set_dir(settings.debug.then(|| state.paths.debug.clone()));
+    if settings.debug {
+        debug::note(format_args!("scan started, v{}", env!("CARGO_PKG_VERSION")));
+    }
     // A hand-edited settings file could hold 0, which would spin a core.
     let interval = Duration::from_millis(settings.interval_ms.clamp(50, 2000));
     let source = open_source(&settings, interval)?;
@@ -190,6 +197,7 @@ pub fn run() {
                 settings: config.join("settings.json"),
                 signature_cache: data.join("signatures.json"),
                 templates: data.join("templates"),
+                debug: data.join("debug"),
             };
             let db = sync::load_local(&paths.signature_cache);
             let settings = Settings::load(&paths.settings);

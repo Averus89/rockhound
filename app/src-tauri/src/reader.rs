@@ -12,6 +12,8 @@ use std::time::{Duration, Instant};
 use image::RgbaImage;
 use rockhound_core::{hud_format, learn_crop, read_crop, Resolved, SignatureDb, TemplateSet};
 
+use crate::debug;
+
 /// OCR is slow (tens of ms) so it runs at most this often.
 const TEACHER_INTERVAL: Duration = Duration::from_millis(1000);
 
@@ -52,8 +54,10 @@ impl Reader {
             return resolved;
         }
         let taught = self.ask_teacher(crop, db);
-        resolved.or_else(|| {
-            taught.map(|value| Resolved {
+        // While templates are incomplete a missing digit is read as its
+        // closest lookalike, so the teacher's answer wins when there is one.
+        taught
+            .map(|value| Resolved {
                 raw: hud_format(value),
                 value: Some(value),
                 // OCR gives no per-glyph scores.
@@ -61,7 +65,7 @@ impl Reader {
                 corrected: false,
                 matches: db.matches(value),
             })
-        })
+            .or(resolved)
     }
 
     /// Ask the teacher (throttled) and learn from its answer when it is
@@ -76,10 +80,18 @@ impl Reader {
             return None;
         }
         self.last_taught = Some(Instant::now());
-        let value = teacher
-            .read_text(crop)
-            .and_then(|text| parse_value(&text))
+        let text = teacher.read_text(crop);
+        let value = text
+            .as_deref()
+            .and_then(parse_value)
             .filter(|v| db.is_valid(*v));
+        if debug::enabled() {
+            debug::note(format_args!(
+                "OCR {text:?} -> {value:?}; templates read {:?}, missing {:?}",
+                read_crop(crop, &self.templates, db).map(|r| r.raw),
+                self.templates.missing_digits()
+            ));
+        }
         let confirmed = value.is_some() && value == self.last_teacher_value;
         self.last_teacher_value = value;
         if confirmed {

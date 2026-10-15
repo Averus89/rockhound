@@ -51,3 +51,22 @@ fn locates_the_readout_among_asteroids_in_a_real_screenshot() {
         Some(17200)
     );
 }
+
+#[test]
+fn reads_digits_with_strong_colour_fringes() {
+    // A later session where chromatic aberration paints the white digits
+    // blue and yellow; they must not be mistaken for the orange pin.
+    let band = fixture("hud_band_21500.png");
+    let r = locate::find_readout(&band).expect("readout found");
+    // The digits span x 298..358, y 126..137 in this slice.
+    assert!(r.x <= 298 && r.x + r.width >= 358, "{r:?}");
+    assert!(r.y <= 126 && r.y + r.height >= 137, "{r:?}");
+
+    let region = image::imageops::crop_imm(&band, r.x, r.y, r.width, r.height).to_image();
+    let mut templates = TemplateSet::default();
+    assert!(learn_crop(&region, 21500, &mut templates) > 0);
+    assert_eq!(
+        read_crop(&region, &templates, &db()).unwrap().value,
+        Some(21500)
+    );
+}

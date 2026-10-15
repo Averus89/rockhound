@@ -24,6 +24,7 @@ export interface Settings {
   region: [number, number, number, number] | null;
   intervalMs: number;
   overlay: boolean;
+  debug: boolean;
 }
 
 export interface Status {

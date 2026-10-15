@@ -106,7 +106,11 @@ fn runs(flags: &[bool], min_gap: usize) -> Vec<(u32, u32)> {
     out
 }
 
-/// Mean HSV saturation of the inked pixels in a rectangle.
+/// HSV saturation of the mean colour of the inked pixels in a rectangle.
+///
+/// The mean, not per-pixel saturation: the game's chromatic aberration
+/// fringes white digits with blue and yellow, which average back to white,
+/// while the pin stays orange.
 fn saturation(
     rgba: &RgbaImage,
     ink: &impl Fn(u32, u32) -> bool,
@@ -115,25 +119,23 @@ fn saturation(
     y0: u32,
     y1: u32,
 ) -> f32 {
-    let (mut sum, mut n) = (0.0, 0u32);
+    let mut sum = [0u64; 3];
     for y in y0..y1 {
         for x in x0..x1 {
-            if !ink(x, y) {
-                continue;
-            }
-            let [r, g, b, _] = rgba.get_pixel(x, y).0;
-            let max = r.max(g).max(b);
-            let min = r.min(g).min(b);
-            if max > 0 {
-                sum += f32::from(max - min) / f32::from(max);
-                n += 1;
+            if ink(x, y) {
+                let p = rgba.get_pixel(x, y).0;
+                for (s, c) in sum.iter_mut().zip(p) {
+                    *s += u64::from(c);
+                }
             }
         }
     }
-    if n == 0 {
+    let max = sum.iter().copied().max().unwrap_or(0);
+    let min = sum.iter().copied().min().unwrap_or(0);
+    if max == 0 {
         0.0
     } else {
-        sum / n as f32
+        (max - min) as f32 / max as f32
     }
 }
 

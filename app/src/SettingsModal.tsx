@@ -82,6 +82,12 @@ export function SettingsModal({ opened, settings, onClose, onSave }: Props) {
           checked={draft.overlay}
           onChange={(e) => setDraft({ ...draft, overlay: e.currentTarget.checked })}
         />
+        <Switch
+          label="Save debug images"
+          description="Saves what the scanner sees to %APPDATA%\io.github.averus89.rockhound\debug while scanning. Send that folder with bug reports."
+          checked={draft.debug}
+          onChange={(e) => setDraft({ ...draft, debug: e.currentTarget.checked })}
+        />
         <NumberInput
           label="Read every (ms)"
           min={50}
