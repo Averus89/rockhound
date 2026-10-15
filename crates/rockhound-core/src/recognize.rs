@@ -16,8 +16,10 @@ use crate::preprocess::otsu;
 
 /// Lines are scaled to this height before learning or matching.
 pub const LINE_HEIGHT: u32 = 48;
-/// Samples kept per character; more adds time without adding accuracy.
-pub const MAX_SAMPLES_PER_CHAR: usize = 12;
+/// Samples kept per character. Learning keeps the first ones, so the cap
+/// must leave room for every bundled crop or late crops (often the ones
+/// with rare digits like 8) are dropped; it still bounds read time.
+pub const MAX_SAMPLES_PER_CHAR: usize = 40;
 /// Separator cell width relative to a digit cell, used to split a labelled
 /// line into cells before any templates exist.
 const SEPARATOR_WIDTH_RATIO: f32 = 0.4;

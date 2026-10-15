@@ -110,5 +110,5 @@ fn reads_unseen_live_crops() {
             read_crop(crop, &templates, &db()).and_then(|r| r.value) == Some(*value)
         })
         .count();
-    assert!(correct >= 18, "{correct}/{} read correctly", crops.len());
+    assert!(correct >= 40, "{correct}/{} read correctly", crops.len());
 }

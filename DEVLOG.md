@@ -1,5 +1,23 @@
 # Devlog
 
+## 2026-10-15: v0.5.1, more live crops; 25,680 is not in the table
+
+Alan's v0.5.0 debug session misread 25,620 and 25,680. Reading the 74
+saved crops with the shipped templates showed two causes:
+
+- Templates kept only the first 12 samples per digit, in file order, so
+  the 8 had samples from the 17,080 crops alone, and new crops added
+  nothing. The cap is now 40, which keeps every bundled sample.
+- 24 more labelled crops from that session are shipped (now 46: 11,565,
+  15,420, 6,740 and 25,680 are new values). One 25,620 crop whose digit
+  line picked up a rock above it was removed.
+- Leave-one-out over the crops: 40/46 (was 18/22); the ratchet is raised to
+  40. Trained on the old 22 only, the new session's crops read 21/25 (was
+  19/25). A read takes ~15 ms with ~260 samples.
+- 25,680 is not a multiple of any signature in the table (it is
+  2 x 4,270 + 4 x 4,285, a mixed cluster), so even a correct read is
+  rejected. Still open.
+
 ## 2026-10-15: v0.5.0, built-in digit templates from live crops
 
 Alan's v0.4.5 debug session: the readout was located on most frames, but
