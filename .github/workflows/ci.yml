@@ -5,11 +5,18 @@ on:
     branches: [main]
   pull_request:
 
+# No job writes to the repo; keep the token read-only and out of .git/config
+# so third-party tools (cargo-audit, npm packages) can't reuse it.
+permissions:
+  contents: read
+
 jobs:
   check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Install Tauri system libraries
         run: |
           sudo apt-get update
@@ -45,6 +52,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-audit
@@ -61,6 +70,8 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: 22
