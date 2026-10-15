@@ -22,7 +22,7 @@ use std::time::Duration;
 use rockhound_core::recognize::TemplateError;
 use rockhound_core::{SignatureDb, TemplateSet};
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
+use tauri::{AppHandle, Emitter, Manager, State, WebviewWindowBuilder, WindowEvent};
 
 use crate::reader::{Reader, Teacher};
 use crate::scanner::{ReplaySource, ScannerHandle};
@@ -193,18 +193,24 @@ pub fn run() {
             };
             let db = sync::load_local(&paths.signature_cache);
             let settings = Settings::load(&paths.settings);
-            if settings.overlay {
-                // A missing overlay shouldn't stop the main window opening.
-                if let Err(e) = overlay::set_visible(app.handle(), true) {
-                    eprintln!("{e}");
-                }
-            }
+            let show_overlay = settings.overlay;
             app.manage(AppState {
                 paths,
                 db: Arc::new(RwLock::new(db)),
                 settings: Mutex::new(settings),
                 scanner: Mutex::new(None),
             });
+            // Windows are created here, after the state exists, because
+            // their first command can arrive before setup returns.
+            for config in &app.config().app.windows {
+                WebviewWindowBuilder::from_config(app.handle(), config)?.build()?;
+            }
+            if show_overlay {
+                // A missing overlay shouldn't stop the main window opening.
+                if let Err(e) = overlay::set_visible(app.handle(), true) {
+                    eprintln!("{e}");
+                }
+            }
             spawn_sync(app.handle().clone());
             Ok(())
         })

@@ -1,5 +1,12 @@
 # Devlog
 
+## 2026-10-15: v0.4.3, "state not managed" on startup
+
+- Tauri builds the configured windows before the setup hook runs, so on
+  Windows the main window's first `get_status` could arrive before
+  `AppState` was registered. Both windows now have `create: false` and are
+  built in setup right after the state is managed.
+
 ## 2026-10-15: v0.4.2, game window not found
 
 - Start reported "Star Citizen isn't running" with the game open. The
