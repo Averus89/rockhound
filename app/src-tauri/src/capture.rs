@@ -11,6 +11,17 @@ use rockhound_core::locate;
 /// Process whose window is captured.
 #[cfg_attr(not(windows), allow(dead_code))]
 const GAME_PROCESS: &str = "StarCitizen.exe";
+/// Title of the game window, used when the process can't be inspected.
+#[cfg_attr(not(windows), allow(dead_code))]
+const GAME_TITLE: &str = "Star Citizen";
+
+/// Whether a window with `title`, owned by the executable at `exe_path`
+/// (when it could be read), is the game.
+#[cfg_attr(not(windows), allow(dead_code))]
+fn is_game_window(title: &str, exe_path: Option<&str>) -> bool {
+    let exe = exe_path.and_then(|p| p.rsplit(['\\', '/']).next());
+    exe.is_some_and(|e| e.eq_ignore_ascii_case(GAME_PROCESS)) || title.trim() == GAME_TITLE
+}
 
 /// Part of the game window searched for the readout, as fractions of its
 /// size (x, y, width, height). The readout appears near the crosshair.
@@ -57,6 +68,12 @@ mod wgc {
     use std::time::Duration;
 
     use image::RgbaImage;
+    use windows::core::PWSTR;
+    use windows::Win32::Foundation::CloseHandle;
+    use windows::Win32::System::Threading::{
+        OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32,
+        PROCESS_QUERY_LIMITED_INFORMATION,
+    };
     use windows_capture::capture::{CaptureControl, Context, GraphicsCaptureApiHandler};
     use windows_capture::frame::Frame;
     use windows_capture::graphics_capture_api::InternalCaptureControl;
@@ -66,7 +83,7 @@ mod wgc {
     };
     use windows_capture::window::Window;
 
-    use super::{capture_rect, readout_crop, GAME_PROCESS};
+    use super::{capture_rect, is_game_window, readout_crop};
     use crate::scanner::FrameSource;
 
     type Latest = Arc<Mutex<Option<RgbaImage>>>;
@@ -110,6 +127,27 @@ mod wgc {
         }
     }
 
+    /// Path of the executable that owns `window`. Asks only for limited
+    /// query rights: Easy Anti-Cheat denies the memory-read access that
+    /// `Window::process_name` needs, which hid the game entirely.
+    fn exe_path(window: &Window) -> Option<String> {
+        let pid = window.process_id().ok()?;
+        let process = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid) }.ok()?;
+        let mut buf = [0u16; 1024];
+        let mut len = buf.len() as u32;
+        let ok = unsafe {
+            QueryFullProcessImageNameW(
+                process,
+                PROCESS_NAME_WIN32,
+                PWSTR(buf.as_mut_ptr()),
+                &mut len,
+            )
+        };
+        let _ = unsafe { CloseHandle(process) };
+        ok.ok()?;
+        Some(String::from_utf16_lossy(&buf[..len as usize]))
+    }
+
     /// Frames from the running game.
     pub struct LiveSource {
         latest: Latest,
@@ -123,8 +161,8 @@ mod wgc {
                 .map_err(|e| format!("cannot list windows: {e}"))?
                 .into_iter()
                 .find(|w| {
-                    w.process_name()
-                        .is_ok_and(|n| n.eq_ignore_ascii_case(GAME_PROCESS))
+                    w.is_valid()
+                        && is_game_window(&w.title().unwrap_or_default(), exe_path(w).as_deref())
                 })
                 .ok_or("Star Citizen isn't running. Start the game, then press Start.")?;
             let latest = Latest::default();
@@ -183,6 +221,16 @@ mod tests {
             Some([90, 90, 10, 10])
         );
         assert_eq!(capture_rect(100, 100, Some([200, 0, 5, 5])), None);
+    }
+
+    #[test]
+    fn recognises_the_game_window() {
+        let exe = r"C:\Games\StarCitizen\LIVE\Bin64\StarCitizen.exe";
+        assert!(is_game_window("whatever", Some(exe)));
+        // Process unreadable: fall back to the window title.
+        assert!(is_game_window("Star Citizen ", None));
+        assert!(!is_game_window("Star Citizen - Wiki - Firefox", None));
+        assert!(!is_game_window("Rockhound", Some(r"C:\rockhound.exe")));
     }
 
     #[test]

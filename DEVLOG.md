@@ -1,5 +1,14 @@
 # Devlog
 
+## 2026-10-15: v0.4.2, game window not found
+
+- Start reported "Star Citizen isn't running" with the game open. The
+  window was matched by process name through `Window::process_name`, which
+  opens the process with memory-read rights; Easy Anti-Cheat denies those,
+  so every lookup failed. The executable path is now read with limited
+  query rights only, and a visible window titled exactly "Star Citizen"
+  also matches when even that is refused.
+
 ## 2026-10-14: v0.4.1, look and feel
 
 - Theme: "ember" accent taken from the in-game pin orange, a dark blue-grey
