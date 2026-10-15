@@ -14,6 +14,8 @@ pub struct Settings {
     pub interval_ms: u64,
     /// Show the click-through overlay over the game.
     pub overlay: bool,
+    /// Save what the scanner sees, for bug reports.
+    pub debug: bool,
 }
 
 impl Default for Settings {
@@ -22,6 +24,7 @@ impl Default for Settings {
             region: None,
             interval_ms: 250,
             overlay: false,
+            debug: false,
         }
     }
 }
@@ -57,6 +60,7 @@ mod tests {
             region: Some([1, 2, 3, 4]),
             interval_ms: 100,
             overlay: true,
+            debug: true,
         };
         s.save(&path).unwrap();
         assert_eq!(Settings::load(&path), s);

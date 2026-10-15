@@ -17,6 +17,8 @@ export interface Reading {
   confidence: number;
   corrected: boolean;
   matches: SignatureMatch[];
+  /** Two-mineral clusters adding up to the value, when no single source does. */
+  mixes: [SignatureMatch, SignatureMatch][];
   at: number;
 }
 
@@ -24,6 +26,7 @@ export interface Settings {
   region: [number, number, number, number] | null;
   intervalMs: number;
   overlay: boolean;
+  debug: boolean;
 }
 
 export interface Status {

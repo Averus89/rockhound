@@ -6,6 +6,7 @@
 //! - `signatures-updated`: a newer signature table was synced.
 
 mod capture;
+mod debug;
 #[cfg(windows)]
 mod ocr;
 mod overlay;
@@ -22,7 +23,7 @@ use std::time::Duration;
 use rockhound_core::recognize::TemplateError;
 use rockhound_core::{SignatureDb, TemplateSet};
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
+use tauri::{AppHandle, Emitter, Manager, State, WebviewWindowBuilder, WindowEvent};
 
 use crate::reader::{Reader, Teacher};
 use crate::scanner::{ReplaySource, ScannerHandle};
@@ -35,6 +36,8 @@ struct Paths {
     settings: PathBuf,
     signature_cache: PathBuf,
     templates: PathBuf,
+    /// Diagnostics, when the player turns them on.
+    debug: PathBuf,
 }
 
 struct AppState {
@@ -79,6 +82,9 @@ fn save_settings(
     settings: Settings,
 ) -> Result<(), String> {
     settings.save(&state.paths.settings)?;
+    // Applied now, not at the next scan start, so switching it off mid-scan
+    // stops the writes.
+    debug::set_dir(settings.debug.then(|| state.paths.debug.clone()));
     // The file is written, so memory must match it even if the overlay
     // can't be shown; otherwise a restart would apply different settings.
     let shown = overlay::set_visible(&app, settings.overlay);
@@ -94,6 +100,10 @@ fn start_scan(app: AppHandle, state: State<'_, AppState>) -> Result<(), String> 
     }
     let reader = open_reader(&state.paths.templates)?;
     let settings = lock(&state.settings).clone();
+    debug::set_dir(settings.debug.then(|| state.paths.debug.clone()));
+    if settings.debug {
+        debug::note(format_args!("scan started, v{}", env!("CARGO_PKG_VERSION")));
+    }
     // A hand-edited settings file could hold 0, which would spin a core.
     let interval = Duration::from_millis(settings.interval_ms.clamp(50, 2000));
     let source = open_source(&settings, interval)?;
@@ -115,7 +125,7 @@ fn start_scan(app: AppHandle, state: State<'_, AppState>) -> Result<(), String> 
 
 /// Templates learned so far plus the OCR teacher that adds to them.
 fn open_reader(template_dir: &Path) -> Result<Reader, String> {
-    let templates = match TemplateSet::load_dir(template_dir) {
+    let learned = match TemplateSet::load_dir(template_dir) {
         Ok(t) => t,
         // First run: nothing learned yet.
         Err(TemplateError::Empty(_)) => TemplateSet::default(),
@@ -128,11 +138,9 @@ fn open_reader(template_dir: &Path) -> Result<Reader, String> {
     let teacher: Option<Box<dyn Teacher>> = Some(Box::new(ocr::WindowsOcr::default()));
     #[cfg(not(windows))]
     let teacher: Option<Box<dyn Teacher>> = None;
-    if templates.is_empty() && teacher.is_none() {
-        return Err("No digit templates yet; build some with rockhound-replay learn.".into());
-    }
     Ok(Reader::new(
-        templates,
+        rockhound_core::bundled_templates(),
+        learned,
         Some(template_dir.to_path_buf()),
         teacher,
     ))
@@ -192,21 +200,28 @@ pub fn run() {
                 settings: config.join("settings.json"),
                 signature_cache: data.join("signatures.json"),
                 templates: data.join("templates"),
+                debug: data.join("debug"),
             };
             let db = sync::load_local(&paths.signature_cache);
             let settings = Settings::load(&paths.settings);
-            if settings.overlay {
-                // A missing overlay shouldn't stop the main window opening.
-                if let Err(e) = overlay::set_visible(app.handle(), true) {
-                    eprintln!("{e}");
-                }
-            }
+            let show_overlay = settings.overlay;
             app.manage(AppState {
                 paths,
                 db: Arc::new(RwLock::new(db)),
                 settings: Mutex::new(settings),
                 scanner: Mutex::new(None),
             });
+            // Windows are created here, after the state exists, because
+            // their first command can arrive before setup returns.
+            for config in &app.config().app.windows {
+                WebviewWindowBuilder::from_config(app.handle(), config)?.build()?;
+            }
+            if show_overlay {
+                // A missing overlay shouldn't stop the main window opening.
+                if let Err(e) = overlay::set_visible(app.handle(), true) {
+                    eprintln!("{e}");
+                }
+            }
             spawn_sync(app.handle().clone());
             Ok(())
         })

@@ -25,6 +25,24 @@ pub fn crop_line(crop: &image::RgbaImage) -> Option<image::GrayImage> {
     Some(recognize::line_image(&gray, &line))
 }
 
+mod bundled {
+    include!(concat!(env!("OUT_DIR"), "/glyphs.rs"));
+}
+
+/// Templates learned from the labelled crops shipped in `data/glyphs`, so a
+/// known HUD scale reads correctly on first run.
+pub fn bundled_templates() -> TemplateSet {
+    let mut templates = TemplateSet::default();
+    for (value, png) in bundled::GLYPHS {
+        // The files are checked by the tests below; a bad one only means
+        // fewer samples, never a failed start.
+        if let Ok(img) = image::load_from_memory(png) {
+            learn_crop(&img.to_rgba8(), *value, &mut templates);
+        }
+    }
+    templates
+}
+
 /// Run the full single-frame pipeline on an RGBA crop of the readout.
 ///
 /// Returns `None` when nothing that looks like a number is in the crop.

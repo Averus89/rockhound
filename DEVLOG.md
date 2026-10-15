@@ -1,5 +1,143 @@
 # Devlog
 
+## 2026-10-15: v0.5.4, review fixes before merging the stack
+
+From CodeRabbit's reviews when PRs #2 to #5 left draft:
+
+- A window titled "Star Citizen" is only taken for the game when its exe
+  path can't be read; a readable path must be StarCitizen.exe.
+- "Save debug images" takes effect when settings are saved, not at the
+  next scan start, so switching it off mid-scan stops the writes.
+- `save_settings` keeps memory in sync with the saved file even when the
+  overlay can't be shown (#4).
+- CI runs with a read-only token that isn't left in the checkout (#3).
+
+## 2026-10-15: v0.5.3, steady readout and a smaller search band
+
+Alan's v0.5.2 session: 25,680 showed as a mixed cluster but blinked, and
+the debug crops were full of rocks, stars and OUTPUT labels.
+
+- The vote cleared the value on the first frame that didn't confirm it,
+  and about half the live frames don't (the locator lands on something
+  else). `Voter::hold` keeps a shown value through unconfirmed frames;
+  the app holds it for 3 s. A different value still replaces it as soon
+  as it wins the vote.
+- The search band is now sized in window heights around the centre
+  (0.3 h either side, 0.25 h to 0.5 h down): 864x360 at 5120x1440 instead
+  of 2048x720. The HUD scales with height, so the old band in widths took
+  in most of an ultrawide screen.
+
+## 2026-10-15: v0.5.2, mixed clusters
+
+Alan chose to show values only a mix of minerals explains (25,680 =
+2 x 4,270 + 4 x 4,285) instead of hiding them.
+
+- `SignatureDb::mixes` lists two-mineral ship-mining clusters of up to 12
+  rocks that add up to a value, fewest rocks first, then same-tier pairs.
+- `resolve` keeps such a value only when every glyph scores at least 0.8:
+  almost any multiple of 5 is some mix, so the table can't catch a misread.
+  Over both debug sessions' 119 crops, only the real 25,680 resolves this
+  way.
+- The readout shows "Mixed cluster" with the first three mixes and a count
+  of the rest; the overlay and history say "Mixed cluster".
+
+## 2026-10-15: v0.5.1, more live crops; 25,680 is not in the table
+
+Alan's v0.5.0 debug session misread 25,620 and 25,680. Reading the 74
+saved crops with the shipped templates showed two causes:
+
+- Templates kept only the first 12 samples per digit, in file order, so
+  the 8 had samples from the 17,080 crops alone, and new crops added
+  nothing. The cap is now 40, which keeps every bundled sample.
+- 24 more labelled crops from that session are shipped (now 46: 11,565,
+  15,420, 6,740 and 25,680 are new values). One 25,620 crop whose digit
+  line picked up a rock above it was removed.
+- Leave-one-out over the crops: 40/46 (was 18/22); the ratchet is raised to
+  40. Trained on the old 22 only, the new session's crops read 21/25 (was
+  19/25). A read takes ~15 ms with ~260 samples.
+- 25,680 is not a multiple of any signature in the table (it is
+  2 x 4,270 + 4 x 4,285, a mixed cluster), so even a correct read is
+  rejected (handled in v0.5.2).
+
+## 2026-10-15: v0.5.0, built-in digit templates from live crops
+
+Alan's v0.4.5 debug session: the readout was located on most frames, but
+Windows OCR returned nothing on every crop (one "T7,080", one "zł500"), so
+nothing was learned. OCR at this size is a dead end for teaching.
+
+- 22 of the session's readout crops, labelled by eye, are shipped in
+  `data/glyphs/1440p/<value>-<n>.png` (all ten digits). A build script in
+  rockhound-core embeds them; `bundled_templates()` learns from them, and
+  the app reads with those plus whatever the player has learned. Only the
+  learned part is saved to the templates folder.
+- The matcher only accepts reads in the HUD's number format (1-3 digits,
+  then ",ddd" groups, no leading zero), so stray commas and extra digits
+  can't win.
+- Learning splits a labelled line with a DP over all cuts instead of
+  placing them one by one; the narrow "1" in "14,000" used to make every
+  14,000 crop fail to teach.
+- Lines are matched at 48 px instead of 24 (leave-one-out over the live
+  crops: 14/22 -> 18/22), with correlation via prefix sums so a read takes
+  ~5 ms instead of ~60. Templates saved at another height are rescaled on
+  load.
+- New tests: bundled templates cover every digit; leave-one-out accuracy on
+  the live crops stays at or above 18/22; HUD grammar.
+
+## 2026-10-15: v0.4.5, OCR teacher input and learning
+
+From Alan's first debug log (v0.4.4): the readout was located on most
+frames, but Windows OCR returned an empty string almost every time and read
+"17.200" only now and then, never twice in a row, so nothing was learned.
+
+- The teacher now gets only the digit line (from the layout step, no pin or
+  box), thresholded so the colour fringes are gone, black on white, 48 px
+  tall with a 24 px white margin. Teacher::read_text takes that image.
+- Two agreeing teacher reads no longer need to be back to back: the last
+  table-valid read is kept across empty ones.
+- Debug mode also saves the OCR input (`ocr-input.png`) and numbered readout
+  crops (`readouts/000.png`..`199.png`) named in the log, for fixtures.
+
+## 2026-10-15: v0.4.4, readout not found with colour fringing
+
+- Alan's live session (21,500 on screen) never located the readout. The
+  game's chromatic aberration paints the white digits in alternating
+  blue, green and orange columns, so per-pixel saturation called them
+  "coloured art" and dropped them with the pin. Text vs pin is now decided
+  by the saturation of a cluster's mean colour: the fringes average back to
+  white, the pin stays orange. New fixture `hud_band_21500.png` and test.
+- While templates are incomplete, the OCR teacher's answer is shown in
+  preference to the template read (a missing 5 was read as 0).
+- Settings: "Save debug images". While scanning, every 2 s it saves the
+  captured band and the located readout, plus a log of locator and OCR
+  results, to `%APPDATA%\io.github.averus89.rockhound\debug`.
+
+## 2026-10-15: v0.4.3, "state not managed" on startup
+
+- Tauri builds the configured windows before the setup hook runs, so on
+  Windows the main window's first `get_status` could arrive before
+  `AppState` was registered. Both windows now have `create: false` and are
+  built in setup right after the state is managed.
+
+## 2026-10-15: v0.4.2, game window not found
+
+- Start reported "Star Citizen isn't running" with the game open. The
+  window was matched by process name through `Window::process_name`, which
+  opens the process with memory-read rights; Easy Anti-Cheat denies those,
+  so every lookup failed. The executable path is now read with limited
+  query rights only, and a visible window titled exactly "Star Citizen"
+  also matches when even that is refused.
+
+## 2026-10-14: v0.4.1, look and feel
+
+- Theme: "ember" accent taken from the in-game pin orange, a dark blue-grey
+  gradient background, translucent panels. Inter and JetBrains Mono are
+  bundled (fontsource), so the look doesn't depend on installed fonts.
+- Main window: pin logo, Scanning/Idle status pill, icon buttons, a large
+  glowing value with a tier-coloured edge, category icon, and a history
+  panel with tier dots.
+- Overlay: glass card with a tier-coloured edge; each new value fades in.
+- Animations are skipped when Windows asks for reduced motion.
+
 ## 2026-10-14: v0.4.0, overlay
 
 - Second window `overlay`: transparent, undecorated, always on top, no

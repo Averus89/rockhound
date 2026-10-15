@@ -1,5 +1,22 @@
-import { ActionIcon, Alert, Button, Container, Group, Stack, Text, Title } from "@mantine/core";
+import {
+  ActionIcon,
+  Alert,
+  Badge,
+  Button,
+  Container,
+  Group,
+  Stack,
+  Text,
+  Title,
+} from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
+import {
+  IconAlertTriangle,
+  IconMapPinFilled,
+  IconPlayerPlayFilled,
+  IconPlayerStopFilled,
+  IconSettings,
+} from "@tabler/icons-react";
 import { useEffect, useState } from "react";
 
 import {
@@ -27,7 +44,10 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const [settingsOpen, settings] = useDisclosure(false);
 
-  const refresh = () => getStatus().then(setStatus).catch((e) => setError(String(e)));
+  const refresh = () =>
+    getStatus()
+      .then(setStatus)
+      .catch((e) => setError(String(e)));
 
   useEffect(() => {
     refresh();
@@ -64,19 +84,50 @@ export function App() {
     <Container size="xs" py="md">
       <Stack>
         <Group justify="space-between">
-          <Title order={3}>Rockhound</Title>
+          <Group gap={8}>
+            <IconMapPinFilled size={26} color="var(--mantine-color-ember-4)" aria-hidden />
+            <Title order={3} lts={0.3}>
+              Rockhound
+            </Title>
+            <Badge
+              variant="dot"
+              color={status?.scanning ? "teal" : "gray"}
+              size="sm"
+              className={status?.scanning ? "rh-pulse" : undefined}
+            >
+              {status?.scanning ? "Scanning" : "Idle"}
+            </Badge>
+          </Group>
           <Group gap="xs">
-            <Button onClick={toggle} color={status?.scanning ? "red" : "orange"} disabled={!status}>
+            <Button
+              onClick={toggle}
+              color={status?.scanning ? "red" : "ember"}
+              variant={status?.scanning ? "light" : "filled"}
+              disabled={!status}
+              leftSection={
+                status?.scanning ? (
+                  <IconPlayerStopFilled size={14} />
+                ) : (
+                  <IconPlayerPlayFilled size={14} />
+                )
+              }
+            >
               {status?.scanning ? "Stop" : "Start"}
             </Button>
             <ActionIcon variant="default" size="lg" onClick={settings.open} aria-label="Settings">
-              ⚙
+              <IconSettings size={18} stroke={1.6} />
             </ActionIcon>
           </Group>
         </Group>
 
         {error && (
-          <Alert color="red" withCloseButton onClose={() => setError(null)}>
+          <Alert
+            color="red"
+            variant="light"
+            icon={<IconAlertTriangle size={18} />}
+            withCloseButton
+            onClose={() => setError(null)}
+          >
             {error}
           </Alert>
         )}
@@ -85,8 +136,8 @@ export function App() {
         <History readings={history} />
 
         {status && (
-          <Text size="xs" c="dimmed" ta="center">
-            Signature data {status.dataVersion} · SC {status.scVersion}
+          <Text size="xs" c="dimmed" ta="center" opacity={0.7}>
+            Signature data {status.dataVersion} · Star Citizen {status.scVersion}
           </Text>
         )}
       </Stack>

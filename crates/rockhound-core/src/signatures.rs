@@ -8,6 +8,9 @@ use serde::{Deserialize, Serialize};
 /// Schema version this build understands. Bump on breaking format changes so
 /// older apps ignore synced files they can't read.
 pub const SCHEMA_VERSION: u32 = 1;
+/// Largest mixed cluster [`SignatureDb::mixes`] considers. Bigger clusters
+/// have so many explanations that a list of them says nothing.
+pub const MAX_MIX_ROCKS: u32 = 12;
 
 #[derive(Debug, thiserror::Error)]
 pub enum SignatureDbError {
@@ -59,6 +62,18 @@ pub struct SignatureMatch {
     pub count: u32,
 }
 
+impl Source {
+    fn matched(&self, count: u32) -> SignatureMatch {
+        SignatureMatch {
+            name: self.name.clone(),
+            category: self.category,
+            tier: self.tier.clone(),
+            base: self.base,
+            count,
+        }
+    }
+}
+
 impl SignatureDb {
     /// Parse and validate a table.
     pub fn from_json(json: &str) -> Result<Self, SignatureDbError> {
@@ -85,16 +100,48 @@ impl SignatureDb {
             .filter(|s| value.is_multiple_of(s.base))
             .filter_map(|s| {
                 let count = value / s.base;
-                (1..=s.max_count).contains(&count).then(|| SignatureMatch {
-                    name: s.name.clone(),
-                    category: s.category,
-                    tier: s.tier.clone(),
-                    base: s.base,
-                    count,
-                })
+                (1..=s.max_count).contains(&count).then(|| s.matched(count))
             })
             .collect();
         out.sort_by_key(|m| m.count);
+        out
+    }
+
+    /// Ways rocks of two different minerals could add up to `value`, fewest
+    /// rocks first, then same-tier pairs (they tend to share a field).
+    /// Only ship-mining sources mix; each pair lists its smaller base first.
+    pub fn mixes(&self, value: u32) -> Vec<[SignatureMatch; 2]> {
+        let mining: Vec<&Source> = self
+            .sources
+            .iter()
+            .filter(|s| s.category == Category::ShipMining)
+            .collect();
+        let mut out = Vec::new();
+        for (i, a) in mining.iter().enumerate() {
+            for b in &mining[i + 1..] {
+                for count_a in 1..MAX_MIX_ROCKS {
+                    let Some(rest) = value.checked_sub(a.base * count_a).filter(|r| *r > 0) else {
+                        break;
+                    };
+                    let count_b = rest / b.base;
+                    if rest.is_multiple_of(b.base) && count_a + count_b <= MAX_MIX_ROCKS {
+                        let mut pair = [a.matched(count_a), b.matched(count_b)];
+                        pair.sort_by_key(|m| m.base);
+                        out.push(pair);
+                    }
+                }
+            }
+        }
+        out.sort_by(|x, y| {
+            let rocks = |p: &[SignatureMatch; 2]| p[0].count + p[1].count;
+            let mixed_tier = |p: &[SignatureMatch; 2]| p[0].tier != p[1].tier;
+            (rocks(x), mixed_tier(x), &x[0].name, &x[1].name).cmp(&(
+                rocks(y),
+                mixed_tier(y),
+                &y[0].name,
+                &y[1].name,
+            ))
+        });
         out
     }
 
@@ -148,6 +195,19 @@ pub(crate) mod tests {
         let m = sample_db().matches(6000);
         let names: Vec<&str> = m.iter().map(|m| m.name.as_str()).collect();
         assert_eq!(names, vec!["Small Ground Deposit", "Salvage Panels"]);
+    }
+
+    #[test]
+    fn mixes_two_minerals_fewest_rocks_first() {
+        // 2 Laranite + 3 Copper = 7650 + 12720.
+        let m = sample_db().mixes(20370);
+        let first: Vec<(&str, u32)> = m[0].iter().map(|p| (p.name.as_str(), p.count)).collect();
+        assert_eq!(first, vec![("Laranite", 2), ("Copper", 3)]);
+        assert!(m
+            .iter()
+            .all(|p| p.iter().all(|x| x.category == Category::ShipMining)));
+        assert!(sample_db().mixes(20371).is_empty());
+        assert!(sample_db().mixes(4240).is_empty());
     }
 
     #[test]

@@ -10,6 +10,7 @@ const reading: Reading = {
   raw: "16,960",
   confidence: 0.95,
   corrected: false,
+  mixes: [],
   matches: [{ name: "Copper", category: "ship_mining", tier: "common", base: 4240, count: 4 }],
   at: 0,
 };
