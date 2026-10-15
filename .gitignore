@@ -5,3 +5,4 @@ dist/
 *.mp4
 *.mkv
 /replay/
+/app/src-tauri/gen/

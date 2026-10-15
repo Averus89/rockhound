@@ -4,7 +4,7 @@ Fast Star Citizen signature scanner. Reads the signature value from the HUD
 while you fly and tells you what's out there (which ore, how many rocks,
 salvage), with a main window and an in-game overlay.
 
-Rewritten from scratch in Rust (Tauri UI coming next). Instead of a general
+Rewritten from scratch in Rust with a Tauri + React (Mantine) UI. Instead of a general
 OCR engine it matches the fixed HUD digit font against stored templates, so a
 read takes a few milliseconds and the app stays small.
 
@@ -15,8 +15,33 @@ Early. What exists now:
 - `crates/rockhound-core`: readout pipeline (cleanup, glyph split, template
   matching, signature table lookup, frame voting).
 - `crates/rockhound-replay`: tool to test the pipeline against reference videos.
-- `data/signatures.json`: signature table (SC 4.7). Will be synced from this
-  repo by the app so a patch only needs a data commit.
+- `app/`: Tauri desktop app. Main window with the current reading, its best
+  match and recent reads; settings for the readout box and read interval.
+  Live game capture is the next milestone.
+- `data/signatures.json`: signature table (SC 4.7). The app checks this repo
+  for a newer copy at startup, caches it, and falls back to the bundled one.
+  Once the file is publicly readable, a patch only needs a data commit; while
+  the repo is private, installed apps keep their bundled table.
+
+## Windows build
+
+Every CI run builds `rockhound-app.exe` and an NSIS installer. Download them
+from the run's **Artifacts** (`rockhound-windows`) on the Actions tab.
+
+## Running the app
+
+Needs Rust, Node 22 and, on Linux, the WebKitGTK dev packages.
+
+```sh
+cd app
+npm install
+npm run tauri dev
+```
+
+Until live capture lands, the app scans a folder of crops made by the replay
+tool. Put templates from `learn` in the app data folder (`templates/`, e.g.
+`%APPDATA%\io.github.averus89.rockhound\templates` on Windows) and start it
+with `ROCKHOUND_REPLAY_DIR` pointing at a frames folder.
 
 ## Testing against a reference video
 

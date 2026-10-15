@@ -1,5 +1,28 @@
 # Devlog
 
+## 2026-10-14: v0.2.0, Tauri shell
+
+Added `app/`: Tauri v2 backend plus a React + Mantine UI (dark, orange accent).
+
+- Main window: start/stop, big current value with best match, tier badge,
+  other possible matches, a "corrected" badge when a 6/8-style swap was used,
+  the last 8 reads, and the active signature data version.
+- Settings modal: readout box (x, y, width, height) and read interval
+  (default 250 ms), saved as JSON in the app config folder.
+- Scan loop on its own thread behind a `FrameSource` trait. Only the replay
+  source exists for now (`ROCKHOUND_REPLAY_DIR`); live WGC capture is next.
+  The UI only gets an event when the voted value changes.
+- Signature sync: bundled table compiled in, newer cached table preferred,
+  background fetch from the repo's raw `data/signatures.json` at startup
+  (`data_version` dates compared as strings). Offline or a bad file keeps the
+  local table. While the repo is private the fetch returns 404 and is ignored.
+- CI builds the frontend and installs WebKitGTK so the app crate is checked.
+- CI `windows-build` job builds the release exe and NSIS installer and uploads
+  them as the `rockhound-windows` artifact.
+
+Verified: app built and run under Xvfb against the synthetic replay clip;
+clicking Start showed 12,720 as Copper x3.
+
 ## 2026-10-14: v0.1.0, project start
 
 Fresh Rust rewrite of the SC signature scanner idea. Plan and decisions are

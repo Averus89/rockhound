@@ -1,0 +1,142 @@
+//! Background scan loop: grab a crop, read it, vote, and report changes.
+
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, RwLock};
+use std::thread::JoinHandle;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+use image::RgbaImage;
+use rockhound_core::{read_crop, SignatureDb, SignatureMatch, TemplateSet, Voter};
+use serde::Serialize;
+
+/// Where readout crops come from.
+pub trait FrameSource: Send {
+    /// The next crop of the readout, or `None` when no frame is available.
+    fn next_crop(&mut self) -> Result<Option<RgbaImage>, String>;
+}
+
+/// Plays back a folder of crops made by `rockhound-replay frames`, looping.
+/// Lets the UI be developed and demoed without the game running.
+pub struct ReplaySource {
+    frames: Vec<PathBuf>,
+    next: usize,
+}
+
+impl ReplaySource {
+    pub fn open(dir: &Path) -> Result<Self, String> {
+        let mut frames: Vec<PathBuf> = std::fs::read_dir(dir)
+            .map_err(|e| format!("cannot open replay folder {}: {e}", dir.display()))?
+            .flatten()
+            .map(|e| e.path())
+            .filter(|p| p.extension().is_some_and(|e| e == "png"))
+            .collect();
+        if frames.is_empty() {
+            return Err(format!("no PNG frames in {}", dir.display()));
+        }
+        frames.sort();
+        Ok(Self { frames, next: 0 })
+    }
+}
+
+impl FrameSource for ReplaySource {
+    fn next_crop(&mut self) -> Result<Option<RgbaImage>, String> {
+        let path = &self.frames[self.next];
+        self.next = (self.next + 1) % self.frames.len();
+        image::open(path)
+            .map(|img| Some(img.to_rgba8()))
+            .map_err(|e| format!("cannot read {}: {e}", path.display()))
+    }
+}
+
+/// Sent to the UI whenever the shown value changes.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Reading {
+    pub value: Option<u32>,
+    pub raw: String,
+    pub confidence: f32,
+    pub corrected: bool,
+    pub matches: Vec<SignatureMatch>,
+    /// Unix time in milliseconds.
+    pub at: u64,
+}
+
+pub struct ScannerHandle {
+    stop: Arc<AtomicBool>,
+    thread: JoinHandle<()>,
+}
+
+impl ScannerHandle {
+    pub fn stop(self) {
+        self.stop.store(true, Ordering::Relaxed);
+        // A panicked scan thread has nothing left to clean up.
+        let _ = self.thread.join();
+    }
+
+    pub fn is_finished(&self) -> bool {
+        self.thread.is_finished()
+    }
+}
+
+/// Start the scan loop on its own thread. `on_reading` gets every change of
+/// the voted value; `on_stop` gets the error that ended the loop, if any.
+pub fn spawn(
+    mut source: Box<dyn FrameSource>,
+    templates: TemplateSet,
+    db: Arc<RwLock<SignatureDb>>,
+    interval: Duration,
+    on_reading: impl Fn(Reading) + Send + 'static,
+    on_stop: impl FnOnce(Option<String>) + Send + 'static,
+) -> ScannerHandle {
+    let stop = Arc::new(AtomicBool::new(false));
+    let stop_flag = Arc::clone(&stop);
+    let thread = std::thread::spawn(move || {
+        let mut voter = Voter::new(3, 2);
+        let mut shown: Option<u32> = None;
+        let mut error = None;
+        while !stop_flag.load(Ordering::Relaxed) {
+            match source.next_crop() {
+                Ok(Some(crop)) => {
+                    let db = db.read().unwrap_or_else(|e| e.into_inner());
+                    let resolved = read_crop(&crop, &templates, &db);
+                    let value = voter.push(resolved.as_ref().and_then(|r| r.value));
+                    if value != shown {
+                        shown = value;
+                        let matches = value.map(|v| db.matches(v)).unwrap_or_default();
+                        on_reading(to_reading(value, matches, resolved));
+                    }
+                }
+                Ok(None) => {}
+                Err(e) => {
+                    error = Some(e);
+                    break;
+                }
+            }
+            std::thread::sleep(interval);
+        }
+        on_stop(error);
+    });
+    ScannerHandle { stop, thread }
+}
+
+fn to_reading(
+    value: Option<u32>,
+    matches: Vec<SignatureMatch>,
+    resolved: Option<rockhound_core::Resolved>,
+) -> Reading {
+    let at = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |d| d.as_millis() as u64);
+    // The voted value can lag the current frame; only report this frame's
+    // details when they describe the shown value.
+    let frame = resolved.filter(|r| r.value == value);
+    Reading {
+        value,
+        raw: frame.as_ref().map(|r| r.raw.clone()).unwrap_or_default(),
+        confidence: frame.as_ref().map_or(0.0, |r| r.confidence),
+        corrected: frame.as_ref().is_some_and(|r| r.corrected),
+        matches,
+        at,
+    }
+}
