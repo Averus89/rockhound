@@ -68,14 +68,12 @@ fn readout_crop(
     let found = locate::find_readout(band);
     let crop = found.map(|r| imageops::crop_imm(band, r.x, r.y, r.width, r.height).to_image());
     if save {
+        let sample = crop.as_ref().and_then(debug::sample);
         debug::note(format_args!(
-            "band {}x{}, readout {found:?}",
+            "band {}x{}, readout {found:?}, sample {sample:?}",
             band.width(),
             band.height()
         ));
-        if let Some(c) = &crop {
-            debug::image("readout", c);
-        }
     }
     crop
 }

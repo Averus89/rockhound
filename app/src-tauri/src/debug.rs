@@ -7,6 +7,7 @@
 use std::fmt::Display;
 use std::io::Write;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::RwLock;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
@@ -66,6 +67,25 @@ pub fn image(name: &str, img: &RgbaImage) {
     }
 }
 
+/// Numbered readout crops kept, oldest replaced first: enough to collect
+/// test fixtures from a session without filling the disk.
+const MAX_SAMPLES: usize = 200;
+static NEXT_SAMPLE: AtomicUsize = AtomicUsize::new(0);
+
+/// Save `img` as the next numbered sample in `readouts/`; returns its
+/// number so log lines can refer to it.
+pub fn sample(img: &RgbaImage) -> Option<usize> {
+    let dir = dir()?.join("readouts");
+    let n = NEXT_SAMPLE.fetch_add(1, Ordering::Relaxed) % MAX_SAMPLES;
+    let saved = std::fs::create_dir_all(&dir)
+        .map_err(image::ImageError::IoError)
+        .and_then(|()| img.save(dir.join(format!("{n:03}.png"))));
+    if let Err(e) = saved {
+        eprintln!("cannot save readout sample: {e}");
+    }
+    Some(n)
+}
+
 /// Rate limiter for snapshots taken on every frame.
 #[derive(Default)]
 pub struct Throttle(Option<Instant>);
@@ -102,11 +122,14 @@ mod tests {
         assert!(!throttle.due(), "throttled");
         note("hello");
         image("band", &img);
+        assert!(sample(&img).is_some());
         set_dir(None);
+        assert!(sample(&img).is_none());
 
         let log = std::fs::read_to_string(dir.join("log.txt")).unwrap();
         assert!(log.trim_end().ends_with(" hello"), "{log}");
         assert!(dir.join("band.png").exists());
+        assert_eq!(std::fs::read_dir(dir.join("readouts")).unwrap().count(), 1);
         std::fs::remove_dir_all(&dir).unwrap();
     }
 }

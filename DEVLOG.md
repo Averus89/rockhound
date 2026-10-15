@@ -1,5 +1,19 @@
 # Devlog
 
+## 2026-10-15: v0.4.5, OCR teacher input and learning
+
+From Alan's first debug log (v0.4.4): the readout was located on most
+frames, but Windows OCR returned an empty string almost every time and read
+"17.200" only now and then, never twice in a row, so nothing was learned.
+
+- The teacher now gets only the digit line (from the layout step, no pin or
+  box), thresholded so the colour fringes are gone, black on white, 48 px
+  tall with a 24 px white margin. Teacher::read_text takes that image.
+- Two agreeing teacher reads no longer need to be back to back: the last
+  table-valid read is kept across empty ones.
+- Debug mode also saves the OCR input (`ocr-input.png`) and numbered readout
+  crops (`readouts/000.png`..`199.png`) named in the log, for fixtures.
+
 ## 2026-10-15: v0.4.4, readout not found with colour fringing
 
 - Alan's live session (21,500 on screen) never located the readout. The

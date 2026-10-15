@@ -9,8 +9,11 @@
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
-use image::RgbaImage;
-use rockhound_core::{hud_format, learn_crop, read_crop, Resolved, SignatureDb, TemplateSet};
+use image::{imageops, GrayImage, Luma, RgbaImage};
+use rockhound_core::preprocess::otsu;
+use rockhound_core::{
+    crop_line, hud_format, learn_crop, read_crop, Resolved, SignatureDb, TemplateSet,
+};
 
 use crate::debug;
 
@@ -19,8 +22,35 @@ const TEACHER_INTERVAL: Duration = Duration::from_millis(1000);
 
 /// A slower reader whose text is trusted to teach templates.
 pub trait Teacher: Send {
-    /// Text read from a readout crop, as written on screen.
-    fn read_text(&mut self, crop: &RgbaImage) -> Option<String>;
+    /// Text read from [`teacher_input`]: dark digits on white.
+    fn read_text(&mut self, line: &GrayImage) -> Option<String>;
+}
+
+/// Scale of the digit line handed to the teacher, over the template
+/// line height (24 px): OCR engines want text well over 20 px tall.
+const TEACHER_SCALE: u32 = 2;
+/// White margin around it, in pixels; OCR misses text touching the edge.
+const TEACHER_MARGIN: u32 = 24;
+
+/// The readout's digit line cleaned up for OCR: only the digits (no pin or
+/// box), thresholded so the colour fringes are gone, dark on white, larger
+/// and with a margin.
+pub fn teacher_input(crop: &RgbaImage) -> Option<GrayImage> {
+    let line = crop_line(crop)?;
+    let threshold = otsu(&line);
+    let (w, h) = (line.width() * TEACHER_SCALE, line.height() * TEACHER_SCALE);
+    let big = imageops::resize(&line, w, h, imageops::FilterType::Triangle);
+    let mut out =
+        GrayImage::from_pixel(w + 2 * TEACHER_MARGIN, h + 2 * TEACHER_MARGIN, Luma([255]));
+    for (x, y, p) in big.enumerate_pixels() {
+        let ink = p.0[0] > threshold;
+        out.put_pixel(
+            x + TEACHER_MARGIN,
+            y + TEACHER_MARGIN,
+            Luma([if ink { 0 } else { 255 }]),
+        );
+    }
+    Some(out)
 }
 
 pub struct Reader {
@@ -29,6 +59,8 @@ pub struct Reader {
     template_dir: Option<PathBuf>,
     teacher: Option<Box<dyn Teacher>>,
     last_taught: Option<Instant>,
+    /// Last table-valid teacher read, kept across failed reads: OCR often
+    /// returns nothing, and two good reads rarely come back to back.
     last_teacher_value: Option<u32>,
 }
 
@@ -80,25 +112,29 @@ impl Reader {
             return None;
         }
         self.last_taught = Some(Instant::now());
-        let text = teacher.read_text(crop);
+        let input = teacher_input(crop)?;
+        let text = teacher.read_text(&input);
         let value = text
             .as_deref()
             .and_then(parse_value)
             .filter(|v| db.is_valid(*v));
         if debug::enabled() {
+            debug::image(
+                "ocr-input",
+                &image::DynamicImage::ImageLuma8(input).to_rgba8(),
+            );
             debug::note(format_args!(
                 "OCR {text:?} -> {value:?}; templates read {:?}, missing {:?}",
                 read_crop(crop, &self.templates, db).map(|r| r.raw),
                 self.templates.missing_digits()
             ));
         }
-        let confirmed = value.is_some() && value == self.last_teacher_value;
-        self.last_teacher_value = value;
-        if confirmed {
-            let v = value?;
-            if learn_crop(crop, v, &mut self.templates) > 0 {
-                self.save_templates();
-            }
+        let v = value?;
+        let confirmed = self.last_teacher_value == Some(v);
+        self.last_teacher_value = Some(v);
+        if confirmed && learn_crop(crop, v, &mut self.templates) > 0 {
+            debug::note(format_args!("learned from {v}"));
+            self.save_templates();
         }
         value
     }
@@ -155,7 +191,7 @@ mod tests {
     struct FixedTeacher(&'static str);
 
     impl Teacher for FixedTeacher {
-        fn read_text(&mut self, _crop: &RgbaImage) -> Option<String> {
+        fn read_text(&mut self, _line: &GrayImage) -> Option<String> {
             Some(self.0.to_string())
         }
     }
@@ -193,6 +229,43 @@ mod tests {
             Some(Box::new(FixedTeacher("17,201"))),
         );
         assert!(reader.read(&fixture("hud_17200.png"), &db()).is_none());
+    }
+
+    #[test]
+    fn teacher_reads_need_not_be_back_to_back() {
+        struct Flaky(usize);
+        impl Teacher for Flaky {
+            fn read_text(&mut self, _line: &GrayImage) -> Option<String> {
+                self.0 += 1;
+                // Every other OCR read comes back empty.
+                Some(
+                    if self.0.is_multiple_of(2) {
+                        ""
+                    } else {
+                        "17,200"
+                    }
+                    .to_string(),
+                )
+            }
+        }
+        let mut reader = Reader::new(TemplateSet::default(), None, Some(Box::new(Flaky(0))));
+        let crop = fixture("hud_17200.png");
+        for _ in 0..3 {
+            reader.last_taught = None;
+            reader.read(&crop, &db());
+        }
+        assert!(!reader.templates.is_empty());
+    }
+
+    #[test]
+    fn teacher_input_is_dark_digits_on_white_with_a_margin() {
+        let input = teacher_input(&fixture("hud_17200_pin.png")).unwrap();
+        assert_eq!(input.height(), 24 * TEACHER_SCALE + 2 * TEACHER_MARGIN);
+        assert!(input.pixels().all(|p| p.0[0] == 0 || p.0[0] == 255));
+        let dark = input.pixels().filter(|p| p.0[0] == 0).count();
+        assert!(dark > 0 && dark * 3 < input.pixels().len(), "{dark}");
+        // Margin rows are blank.
+        assert!((0..input.width()).all(|x| input.get_pixel(x, 0).0[0] == 255));
     }
 
     #[test]
