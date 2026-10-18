@@ -135,4 +135,14 @@ Mallachi; the signature table is converted from it (see
 
 ## License
 
-MIT
+Rockhound is source-available under the
+[PolyForm Noncommercial License 1.0.0](LICENSE). You may use, study, modify and
+share it for any noncommercial purpose. Selling it, selling forks of it, or
+using it in a commercial product or service is not allowed without written
+permission from the maintainer. `data/signatures.json` keeps its MIT license
+(see `THIRD_PARTY_NOTICES.md`).
+
+## Contributing and security
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) to contribute. Report vulnerabilities
+privately as described in [SECURITY.md](SECURITY.md), not in public issues.

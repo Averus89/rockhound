@@ -1,5 +1,20 @@
 # Devlog
 
+## 2026-10-18: License change, contributing guide and security policy
+
+Alan asked for a license that stops others copying and monetizing forks, plus
+contribution and security reporting rules. No version bump, so no release.
+
+- `LICENSE` is now PolyForm Noncommercial 1.0.0 (Cargo `license` field
+  updated to its SPDX id). Source-available, not OSI open source: free for
+  noncommercial use and forks, no selling or commercial use.
+- `data/signatures.json` stays MIT, credited to Mallachi in
+  `THIRD_PARTY_NOTICES.md`; `LICENSE` says listed files keep their own license.
+- `CONTRIBUTING.md`: contributions are licensed under the project license and
+  the maintainer may relicense them.
+- `SECURITY.md` and an issue-form contact link send vulnerability reports to
+  GitHub private vulnerability reporting.
+
 ## 2026-10-18: v0.6.0, automatic releases
 
 Alan asked for a package release with release notes on every merge to main.

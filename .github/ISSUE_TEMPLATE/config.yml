@@ -1,0 +1,4 @@
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/Averus89/rockhound/security/advisories/new
+    about: Please report security issues privately, not in a public issue.
