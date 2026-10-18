@@ -162,7 +162,8 @@ jobs:
         run: |
           version=$(node app/scripts/release.mjs version)
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          assets=$(gh release view "v$version" --json assets --jq '.assets[].name' 2>/dev/null || true)
+          assets=$(gh release view "v$version" --json isDraft,assets \
+            --jq 'select(.isDraft | not) | .assets[].name' 2>/dev/null || true)
           if grep -qxF "Rockhound_${version}_x64-setup.exe" <<< "$assets" &&
              grep -qxF "Rockhound_${version}_portable.exe" <<< "$assets"; then
             echo "v$version is already released."
@@ -183,9 +184,11 @@ jobs:
           cat notes.md
           cp artifact/rockhound-app.exe "Rockhound_${VERSION}_portable.exe"
           files=("artifact/bundle/nsis/Rockhound_${VERSION}_x64-setup.exe" "Rockhound_${VERSION}_portable.exe")
-          # A release left without its files by a failed upload gets them now.
+          # A release left without its files, or as a draft, by a failed
+          # upload or publish gets them now and is published.
           if gh release view "v$VERSION" > /dev/null 2>&1; then
             gh release upload "v$VERSION" "${files[@]}" --clobber
+            gh release edit "v$VERSION" --draft=false
           else
             gh release create "v$VERSION" "${files[@]}" --target "$GITHUB_SHA" \
               --title "Rockhound v$VERSION" --notes-file notes.md --generate-notes

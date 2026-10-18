@@ -17,8 +17,9 @@ Alan asked for a package release with release notes on every merge to main.
   instead of the release.
 - The release job uses `gh` rather than a third-party action, so the only
   write-scoped token runs no outside code. A release left without its files
-  by a failed upload gets them on the next run, and pending release runs
-  queue instead of replacing each other.
+  (or a draft left by a failed publish) gets them on the next run and is
+  published, and pending release runs queue instead of replacing each
+  other.
 
 ## 2026-10-15: v0.5.5, end-to-end tests without the game
 
