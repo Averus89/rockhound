@@ -6,7 +6,7 @@ members = ["crates/rockhound-core", "crates/rockhound-replay", "app/src-tauri"]
 version = "0.6.0"
 edition = "2021"
 rust-version = "1.87"
-license = "MIT"
+license = "PolyForm-Noncommercial-1.0.0"
 authors = ["Alan (Averus89)"]
 repository = "https://github.com/Averus89/rockhound"
 
