@@ -1,5 +1,26 @@
 # Devlog
 
+## 2026-10-18: v0.6.0, automatic releases
+
+Alan asked for a package release with release notes on every merge to main.
+
+- New CI job `release`: after all other jobs pass on a push to main, it
+  publishes GitHub Release `v<version>` with the NSIS installer and the
+  portable exe (`Rockhound_<version>_portable.exe`). Merges that don't bump
+  the version (Dependabot) find the release already there and skip.
+- Release notes are this version's DEVLOG entry followed by GitHub's list of
+  PRs merged since the previous release. So every PR that bumps the version
+  needs a `## <date>: v<version>, <title>` entry here.
+- `app/scripts/release.mjs` reads the version, failing when Cargo.toml,
+  package.json and tauri.conf.json disagree, and extracts the DEVLOG entry.
+  The `check` job runs both on PRs, so a missed bump or entry fails the PR
+  instead of the release.
+- The release job uses `gh` rather than a third-party action, so the only
+  write-scoped token runs no outside code. A release left without its files
+  (or a draft left by a failed publish) gets them on the next run and is
+  published, and pending release runs queue instead of replacing each
+  other.
+
 ## 2026-10-15: v0.5.5, end-to-end tests without the game
 
 Alan asked for app tests an agent or CI can run without the game, to work
