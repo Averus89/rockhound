@@ -143,9 +143,12 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    # Queue rather than race, so two quick merges can't both create a release.
+    # Queue rather than race, so two quick merges can't both create a release,
+    # and keep every pending run (the default keeps only the newest), so no
+    # version bump goes unreleased.
     concurrency:
       group: release
+      queue: max
       cancel-in-progress: false
     env:
       GH_TOKEN: ${{ github.token }}
@@ -159,8 +162,9 @@ jobs:
         run: |
           version=$(node app/scripts/release.mjs version)
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          setup="Rockhound_${version}_x64-setup.exe"
-          if gh release view "v$version" --json assets --jq '.assets[].name' 2>/dev/null | grep -qxF "$setup"; then
+          assets=$(gh release view "v$version" --json assets --jq '.assets[].name' 2>/dev/null || true)
+          if grep -qxF "Rockhound_${version}_x64-setup.exe" <<< "$assets" &&
+             grep -qxF "Rockhound_${version}_portable.exe" <<< "$assets"; then
             echo "v$version is already released."
           else
             echo "release=true" >> "$GITHUB_OUTPUT"
