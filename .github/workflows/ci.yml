@@ -5,8 +5,9 @@ on:
     branches: [main]
   pull_request:
 
-# No job writes to the repo; keep the token read-only and out of .git/config
-# so third-party tools (cargo-audit, npm packages) can't reuse it.
+# Only the release job writes to the repo, and it runs no third-party code.
+# Keep the token read-only and out of .git/config elsewhere so third-party
+# tools (cargo-audit, npm packages) can't reuse it.
 permissions:
   contents: read
 
@@ -33,6 +34,10 @@ jobs:
           npm run build
           npm run typecheck:e2e
           npm test
+      # Fails the PR, not the release after merge, when a version bump missed
+      # a file or the DEVLOG entry that becomes the release notes.
+      - name: Check version and release notes
+        run: node app/scripts/release.mjs notes "$(node app/scripts/release.mjs version)" > /dev/null
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy, llvm-tools-preview
@@ -127,3 +132,57 @@ jobs:
             target/release/rockhound-app.exe
             target/release/bundle/nsis/*.exe
           if-no-files-found: error
+
+  # Every push to main that passes all jobs and carries a version without a
+  # release yet publishes one: the installer, the portable exe, and notes made
+  # of that version's DEVLOG entry plus the PRs merged since the last release.
+  # Merges that don't bump the version (Dependabot) release nothing.
+  release:
+    needs: [check, e2e, audit, windows-build]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    # Queue rather than race, so two quick merges can't both create a release.
+    concurrency:
+      group: release
+      cancel-in-progress: false
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Decide whether to release
+        id: version
+        run: |
+          version=$(node app/scripts/release.mjs version)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          setup="Rockhound_${version}_x64-setup.exe"
+          if gh release view "v$version" --json assets --jq '.assets[].name' 2>/dev/null | grep -qxF "$setup"; then
+            echo "v$version is already released."
+          else
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/download-artifact@v7
+        if: steps.version.outputs.release
+        with:
+          name: rockhound-windows
+          path: artifact
+      - name: Publish GitHub Release
+        if: steps.version.outputs.release
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          node app/scripts/release.mjs notes "$VERSION" > notes.md
+          cat notes.md
+          cp artifact/rockhound-app.exe "Rockhound_${VERSION}_portable.exe"
+          files=("artifact/bundle/nsis/Rockhound_${VERSION}_x64-setup.exe" "Rockhound_${VERSION}_portable.exe")
+          # A release left without its files by a failed upload gets them now.
+          if gh release view "v$VERSION" > /dev/null 2>&1; then
+            gh release upload "v$VERSION" "${files[@]}" --clobber
+          else
+            gh release create "v$VERSION" "${files[@]}" --target "$GITHUB_SHA" \
+              --title "Rockhound v$VERSION" --notes-file notes.md --generate-notes
+          fi

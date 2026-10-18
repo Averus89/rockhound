@@ -23,10 +23,17 @@ Early. What exists now:
   Once the file is publicly readable, a patch only needs a data commit; while
   the repo is private, installed apps keep their bundled table.
 
-## Windows build
+## Windows build and releases
 
 Every CI run builds `rockhound-app.exe` and an NSIS installer. Download them
 from the run's **Artifacts** (`rockhound-windows`) on the Actions tab.
+
+A merge to main that bumps the version publishes a GitHub Release with the
+installer, the portable exe and notes taken from that version's `DEVLOG.md`
+entry plus the merged PRs. To release, bump the version in `Cargo.toml`,
+`app/package.json` and `app/src-tauri/tauri.conf.json`, and add a
+`## <date>: v<version>, <title>` entry to `DEVLOG.md`; CI checks both on the
+PR.
 
 ## Running the app
 

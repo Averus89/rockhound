@@ -24,6 +24,7 @@
 - [ ] Let the player move the overlay (drag mode or position setting)
 ## Milestone 5: packaging + release workflow
 - [x] Windows exe + installer artifact in CI
+- [x] GitHub Release with notes on every version bump merged to main
 - [x] Coverage gate, frontend tests, cargo/npm audit, Dependabot
 - [ ] CodeQL if the repo goes public
 - [x] End-to-end UI tests on a fake game (WebdriverIO + tauri-driver, CI)
