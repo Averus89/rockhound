@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "data_version": "2026.03.18",
-  "sc_version": "4.7",
+  "data_version": "2026.10.19",
+  "sc_version": "4.10.2",
   "sources": [
     {
       "name": "Quantainium",
