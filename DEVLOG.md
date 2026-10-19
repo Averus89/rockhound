@@ -1,5 +1,13 @@
 # Devlog
 
+## 2026-10-19: Website
+
+One-page static site in `site/`, built from the promo kit (colours, type and
+motion tokens). Hero with an animated overlay readout, how a read works, the
+main window, a "Try a number" lookup using the signature table, download and
+donation links, credits and the fan-made disclaimer. No build step and no
+app change, so no version bump. Hosting is still to be decided.
+
 ## 2026-10-19: Signature table from SC 4.10.2
 
 First `sigextract update` run on Alan's PC against the live game. Every
