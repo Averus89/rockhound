@@ -20,6 +20,8 @@ plugin against GitHub Releases, which works because the repo is public.
   Dependabot PRs build unsigned as before). The release job uploads the
   `.sig` and a `latest.json` made by `release.mjs latest`, and fails when
   the installer is unsigned or the pubkey is missing.
+- The plugin's `zip` feature is off: it only unpacks zipped update bundles,
+  which we don't make, and its `zip` 4 has open RustSec advisories.
 - Copies older than v0.8.0 have no updater; they need this one installed by
   hand once.
 
