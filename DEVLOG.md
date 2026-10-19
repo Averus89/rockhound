@@ -8,6 +8,11 @@ checks. README and website now say to choose "More info", then "Run
 anyway". Code signing (Azure Trusted Signing or a certificate) is left for
 later. Docs only, so no version bump.
 
+CI no longer runs for changes that only touch Markdown, `LICENSE`, `site/`,
+issue templates, Dependabot config or the Pages workflow (`paths-ignore`
+on both triggers). No required status checks are set on main, so skipped
+runs don't block merging.
+
 ## 2026-10-19: v0.8.0, automatic updates
 
 Alan asked how the app could update itself. It now uses Tauri's updater
