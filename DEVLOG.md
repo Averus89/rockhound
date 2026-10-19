@@ -1,5 +1,28 @@
 # Devlog
 
+## 2026-10-19: v0.8.0, automatic updates
+
+Alan asked how the app could update itself. It now uses Tauri's updater
+plugin against GitHub Releases, which works because the repo is public.
+
+- At startup the main window checks
+  `releases/latest/download/latest.json`. When a newer version is out it
+  shows "Rockhound vX is available" with "Update and restart": the plugin
+  downloads the installer, checks its minisign signature against
+  `plugins.updater.pubkey` and runs it in passive mode, which closes and
+  restarts the app. Offline or unreachable: nothing is shown.
+- The portable exe gets the notice and the releases address, not the
+  button, since the installer would install a second copy instead of
+  replacing it. `is_installed` tells them apart by the `uninstall.exe` the
+  installer puts next to the exe.
+- CI signs the installer when `TAURI_SIGNING_PRIVATE_KEY` is set
+  (`createUpdaterArtifacts` is switched on only then, so local builds and
+  Dependabot PRs build unsigned as before). The release job uploads the
+  `.sig` and a `latest.json` made by `release.mjs latest`, and fails when
+  the installer is unsigned or the pubkey is missing.
+- Copies older than v0.8.0 have no updater; they need this one installed by
+  hand once.
+
 ## 2026-10-19: Signature table from SC 4.10.2
 
 First `sigextract update` run on Alan's PC against the live game. Every

@@ -1,7 +1,10 @@
-// Release helpers for CI: the app version and its DEVLOG entry.
+// Release helpers for CI: the app version, its DEVLOG entry and the updater
+// manifest.
 //
 //   node app/scripts/release.mjs version         prints the version
 //   node app/scripts/release.mjs notes <version> prints that version's notes
+//   node app/scripts/release.mjs latest <version> <repo> <sig file>
+//                                                prints latest.json
 
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -55,7 +58,25 @@ export function extractNotes(devlog, version) {
   return `## ${title}\n\n${body.trim()}\n`;
 }
 
-function main([command, version]) {
+/**
+ * Returns the updater manifest (`latest.json`) installed apps read from the
+ * newest release to find, download and verify the new installer.
+ * @param {{version: string, repo: string, signature: string, notes: string, date: Date}} release
+ *   repo is "owner/name"; signature is the installer's .sig file contents
+ * @returns {string}
+ */
+export function updaterManifest({ version, repo, signature, notes, date }) {
+  const url = `https://github.com/${repo}/releases/download/v${version}/Rockhound_${version}_x64-setup.exe`;
+  const manifest = {
+    version,
+    notes,
+    pub_date: date.toISOString(),
+    platforms: { "windows-x86_64": { signature: signature.trim(), url } },
+  };
+  return `${JSON.stringify(manifest, null, 2)}\n`;
+}
+
+function main([command, version, repo, sigFile]) {
   const read = (path) => readFileSync(new URL(path, ROOT), "utf8");
   if (command === "version") {
     console.log(readVersion(read));
@@ -64,8 +85,23 @@ function main([command, version]) {
     // A release without its changelog entry is a missed DEVLOG update.
     if (!notes) throw new Error(`DEVLOG.md has no entry for v${version}`);
     process.stdout.write(notes);
+  } else if (command === "latest" && version && repo && sigFile) {
+    // A manifest without the key the app was built with would let every
+    // installed copy download an update it then refuses.
+    const { pubkey } = JSON.parse(read("app/src-tauri/tauri.conf.json")).plugins.updater;
+    if (!pubkey) throw new Error("tauri.conf.json has no updater pubkey");
+    const manifest = updaterManifest({
+      version,
+      repo,
+      signature: readFileSync(sigFile, "utf8"),
+      notes: extractNotes(read("DEVLOG.md"), version),
+      date: new Date(),
+    });
+    process.stdout.write(manifest);
   } else {
-    throw new Error("usage: release.mjs version | notes <version>");
+    throw new Error(
+      "usage: release.mjs version | notes <version> | latest <version> <repo> <sig file>",
+    );
   }
 }
 

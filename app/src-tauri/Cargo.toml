@@ -20,6 +20,7 @@ rockhound-core = { path = "../../crates/rockhound-core" }
 serde.workspace = true
 serde_json.workspace = true
 tauri = { version = "2", features = [] }
+tauri-plugin-updater = "2"
 ureq = "3"
 
 [target.'cfg(windows)'.dependencies]

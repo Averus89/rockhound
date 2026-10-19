@@ -23,8 +23,7 @@ Early. What exists now:
   Live capture of the game window on Windows, and an overlay.
 - `data/signatures.json`: signature table (SC 4.7). The app checks this repo
   for a newer copy at startup, caches it, and falls back to the bundled one.
-  Once the file is publicly readable, a patch only needs a data commit; while
-  the repo is private, installed apps keep their bundled table.
+  A patch only needs a data commit.
 
 ## Windows build and releases
 
@@ -37,6 +36,21 @@ entry plus the merged PRs. To release, bump the version in `Cargo.toml`,
 `app/package.json` and `app/src-tauri/tauri.conf.json`, and add a
 `## <date>: v<version>, <title>` entry to `DEVLOG.md`; CI checks both on the
 PR.
+
+### Updates
+
+Installed copies update themselves. At startup the app reads `latest.json`
+from the newest release; when it names a newer version, the main window
+offers "Update and restart", which downloads the installer, checks its
+signature against the public key in `tauri.conf.json` and runs it. The
+portable exe can't replace itself, so it only says a new version is out.
+
+CI signs the installer with the updater key, kept in the repository secrets
+`TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`; a
+release without them fails rather than publish an update nobody can install.
+To make a new key: `npx tauri signer generate -w ~/.tauri/rockhound.key`,
+then put the `.pub` contents in `plugins.updater.pubkey`. A new key strands
+installed copies on their version, so keep the old one safe.
 
 ## Running the app
 

@@ -21,6 +21,8 @@ import {
 import { useEffect, useState } from "react";
 
 import {
+  type AvailableUpdate,
+  checkForUpdate,
   getStatus,
   type Location,
   onReading,
@@ -36,6 +38,7 @@ import {
 import { History } from "./History";
 import { Readout } from "./Readout";
 import { SettingsModal } from "./SettingsModal";
+import { UpdateNotice } from "./UpdateNotice";
 
 const HISTORY_SIZE = 8;
 
@@ -45,6 +48,7 @@ export function App() {
   const [history, setHistory] = useState<Reading[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [settingsOpen, settings] = useDisclosure(false);
+  const [update, setUpdate] = useState<AvailableUpdate | null>(null);
 
   const refresh = () =>
     getStatus()
@@ -68,6 +72,10 @@ export function App() {
       }),
       onSignaturesUpdated(() => refresh()),
     ];
+    // Offline or GitHub unreachable: keep running this version quietly.
+    checkForUpdate()
+      .then(setUpdate)
+      .catch((e) => console.warn("update check failed:", e));
     return () => unlisten.forEach((p) => p.then((off) => off()));
   }, []);
 
@@ -135,6 +143,8 @@ export function App() {
             </ActionIcon>
           </Group>
         </Group>
+
+        {update && <UpdateNotice update={update} />}
 
         {error && (
           <Alert

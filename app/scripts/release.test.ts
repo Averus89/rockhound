@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 // @ts-expect-error plain JS module, run by Node in CI without a build step
-import { extractNotes, readVersion } from "./release.mjs";
+import { extractNotes, readVersion, updaterManifest } from "./release.mjs";
 
 const DEVLOG = `# Devlog
 
@@ -62,5 +62,30 @@ describe("readVersion", () => {
     expect(() => readVersion(files("1.2.3", "1.2.3", "1.2.2"))).toThrow(
       "app/src-tauri/tauri.conf.json: 1.2.2",
     );
+  });
+});
+
+describe("updaterManifest", () => {
+  it("points the Windows updater at this release's signed installer", () => {
+    const manifest = JSON.parse(
+      updaterManifest({
+        version: "0.8.0",
+        repo: "Averus89/rockhound",
+        signature: "c2lnbmF0dXJl\n",
+        notes: "## v0.8.0\n",
+        date: new Date("2026-10-19T12:00:00Z"),
+      }),
+    );
+    expect(manifest).toEqual({
+      version: "0.8.0",
+      notes: "## v0.8.0\n",
+      pub_date: "2026-10-19T12:00:00.000Z",
+      platforms: {
+        "windows-x86_64": {
+          signature: "c2lnbmF0dXJl",
+          url: "https://github.com/Averus89/rockhound/releases/download/v0.8.0/Rockhound_0.8.0_x64-setup.exe",
+        },
+      },
+    });
   });
 });
