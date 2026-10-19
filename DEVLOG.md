@@ -1,5 +1,13 @@
 # Devlog
 
+## 2026-10-19: SmartScreen note
+
+Alan hit the SmartScreen warning installing v0.8.0. The installer has the
+updater signature but no Authenticode signature, which is what Windows
+checks. README and website now say to choose "More info", then "Run
+anyway". Code signing (Azure Trusted Signing or a certificate) is left for
+later. Docs only, so no version bump.
+
 ## 2026-10-19: v0.8.0, automatic updates
 
 Alan asked how the app could update itself. It now uses Tauri's updater
