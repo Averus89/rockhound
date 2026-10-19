@@ -82,7 +82,10 @@ impl Shown {
 /// Send `reading` (or the shown one re-ranked) to the UI.
 fn show(app: &AppHandle, shown: &Mutex<Shown>, db: &RwLock<SignatureDb>, reading: Option<Reading>) {
     let db = db.read().unwrap_or_else(|e| e.into_inner());
-    if let Some(r) = lock(shown).update(reading, &db) {
+    // Held through the emit, so a reading ranked for the old location can't
+    // be sent after the re-ranked one.
+    let mut shown = lock(shown);
+    if let Some(r) = shown.update(reading, &db) {
         let _ = app.emit("reading", r);
     }
 }
