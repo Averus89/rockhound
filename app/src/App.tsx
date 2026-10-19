@@ -82,16 +82,18 @@ export function App() {
   };
 
   const save = async (next: Settings) => {
-    await saveSettings(next);
-    await refresh();
+    try {
+      await saveSettings(next);
+    } finally {
+      // Settings are written even when showing the overlay fails, so refresh
+      // either way; stale settings would be resent by the next save.
+      await refresh();
+    }
   };
 
   const setLocation = (location: Location) => {
     if (!status) return;
-    // Saved even when showing the overlay fails, so refresh either way.
-    saveSettings({ ...status.settings, location })
-      .catch((e) => setError(String(e)))
-      .finally(refresh);
+    save({ ...status.settings, location }).catch((e) => setError(String(e)));
   };
 
   return (
