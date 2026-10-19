@@ -37,6 +37,10 @@ entry plus the merged PRs. To release, bump the version in `Cargo.toml`,
 `## <date>: v<version>, <title>` entry to `DEVLOG.md`; CI checks both on the
 PR.
 
+The installer isn't Authenticode-signed, so SmartScreen warns on first
+install ("More info", then "Run anyway"). In-app updates are downloaded by the
+app, not a browser, so they don't carry the download mark that triggers it.
+
 ### Updates
 
 Installed copies update themselves. At startup the app reads `latest.json`

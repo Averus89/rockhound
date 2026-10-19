@@ -33,6 +33,18 @@ pull request.
   the rest of the cap, such as digits a small pack never showed. With one
   shipped height nothing changes and no extra work is done per frame.
 - New dependency: `zip` 9 with no default features (stored entries only).
+## 2026-10-19: SmartScreen note
+
+Alan hit the SmartScreen warning installing v0.8.0. The installer has the
+updater signature but no Authenticode signature, which is what Windows
+checks. README and website now say to choose "More info", then "Run
+anyway". Code signing (Azure Trusted Signing or a certificate) is left for
+later. Docs only, so no version bump.
+
+CI no longer runs for changes that only touch Markdown, `LICENSE`, `site/`,
+issue templates, Dependabot config or the Pages workflow (`paths-ignore`
+on both triggers). No required status checks are set on main, so skipped
+runs don't block merging.
 
 ## 2026-10-19: v0.8.0, automatic updates
 
