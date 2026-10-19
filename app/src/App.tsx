@@ -57,7 +57,7 @@ export function App() {
       onReading((r) => {
         setReading(r);
         if (r.value === null) return;
-        // A location change resends the same reading re-ranked.
+        // A location change resends the shown reading re-ranked.
         setHistory((h) =>
           h[0]?.at === r.at ? [r, ...h.slice(1)] : [r, ...h].slice(0, HISTORY_SIZE),
         );
@@ -88,7 +88,10 @@ export function App() {
 
   const setLocation = (location: Location) => {
     if (!status) return;
-    save({ ...status.settings, location }).catch((e) => setError(String(e)));
+    // Saved even when showing the overlay fails, so refresh either way.
+    saveSettings({ ...status.settings, location })
+      .catch((e) => setError(String(e)))
+      .finally(refresh);
   };
 
   return (
