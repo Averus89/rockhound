@@ -1,5 +1,12 @@
 # Devlog
 
+## 2026-10-19: Signature table from SC 4.10.2
+
+First `sigextract update` run on Alan's PC against the live game. Every
+signature value is unchanged; the table now records `sc_version` 4.10.2
+(read from `build_manifest.id`) and `data_version` 2026.10.19, so
+installed apps sync it. Data only, so no version bump.
+
 ## 2026-10-19: v0.7.0, space or planet
 
 Alan pointed out that some signatures collide across locations: 3000 is a
