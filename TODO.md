@@ -44,6 +44,7 @@
 
 ## Website
 - [x] One-page static site in `site/`
-- [ ] Choose hosting (repo is public, so GitHub Pages is free)
+- [x] GitHub Pages deploy workflow (`pages.yml`)
+- [ ] Switch Pages source to GitHub Actions in repo settings (Alan)
 - [ ] Final tagline ("Know the rock before you land." is a placeholder)
 - [ ] Social preview image for link cards
