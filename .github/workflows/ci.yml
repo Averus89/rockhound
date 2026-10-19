@@ -1,9 +1,26 @@
 name: CI
 
+# Changes that can't affect the app (docs, the website, repo housekeeping)
+# skip the build. A release always bumps the version in source files, so it
+# still runs the whole pipeline.
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - "**.md"
+      - LICENSE
+      - site/**
+      - .github/ISSUE_TEMPLATE/**
+      - .github/dependabot.yml
+      - .github/workflows/pages.yml
   pull_request:
+    paths-ignore:
+      - "**.md"
+      - LICENSE
+      - site/**
+      - .github/ISSUE_TEMPLATE/**
+      - .github/dependabot.yml
+      - .github/workflows/pages.yml
 
 # Only the release job writes to the repo, and it runs no third-party code.
 # Keep the token read-only and out of .git/config elsewhere so third-party
