@@ -66,7 +66,9 @@ The rules are in `src/table.rs`.
 - `sigextract dump MineableRock_Gold` prints matching records as JSON, to
   see where the signature moved if a patch changed the data layout.
 - "unsupported Game2.dcb layout" means CIG changed the file format; the
-  parser in `src/datacore.rs` needs updating.
+  parser in `src/datacore.rs` needs updating. `sigextract export` saves the
+  decompressed `Game2.dcb` (about 330 MB) so it can be studied without the
+  whole archive; zip it and send it along with the error.
 
 ## How it works
 

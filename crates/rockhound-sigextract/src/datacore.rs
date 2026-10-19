@@ -276,9 +276,15 @@ impl DataCore {
             pos += count as usize * def.size as usize;
         }
         if pos != bytes.len() {
+            // Name the counts, so a report of this error says which table
+            // changed size (the gap is usually a multiple of one count).
             return Err(DataCoreError::Layout(format!(
-                "data section ends at byte {pos} but the file has {} bytes",
-                bytes.len()
+                "data section ends at byte {pos} but the file has {} bytes \
+                 (version {version}, structs {struct_count}, properties {prop_count}, \
+                 enums {enum_count}, mappings {mapping_count}, records {record_count}, \
+                 header {:?})",
+                bytes.len(),
+                &header[9..]
             )));
         }
 

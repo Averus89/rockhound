@@ -34,6 +34,11 @@ pub fn resolve_input(path: &Path) -> PathBuf {
 
 /// Load DataCore from a `Data.p4k` or a loose `.dcb` file.
 pub fn load(path: &Path) -> Result<DataCore> {
+    Ok(DataCore::parse(read_dcb(path)?)?)
+}
+
+/// The raw, decompressed Game2.dcb from a `Data.p4k` or a loose `.dcb` file.
+pub fn read_dcb(path: &Path) -> Result<Vec<u8>> {
     let is_dcb = path
         .extension()
         .is_some_and(|e| e.eq_ignore_ascii_case("dcb"));
@@ -45,7 +50,7 @@ pub fn load(path: &Path) -> Result<DataCore> {
             .with_context(|| format!("reading {}", path.display()))?;
         bytes
     };
-    Ok(DataCore::parse(bytes)?)
+    Ok(bytes)
 }
 
 fn is_dcb_name(name: &str) -> bool {

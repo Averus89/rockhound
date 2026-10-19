@@ -19,7 +19,8 @@ same method. No app change, so no version bump.
   something changed. The report lists changed rows, rows nothing matched,
   disagreeing entities and scannable entities no row claims.
 - `list` prints every entity signature as TSV and `dump` prints a record as
-  JSON, for tuning the name rules and following layout changes.
+  JSON, for tuning the name rules and following layout changes. `export`
+  saves the decompressed Game2.dcb for offline debugging.
 - The parser checks that every struct's fields add up to its declared size
   and that the data section ends at the end of the file, so a format change
   fails loudly instead of producing wrong values.

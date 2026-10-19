@@ -3,13 +3,14 @@
 //! 1. `update`  merge the game's values into the table (the usual command).
 //! 2. `list`    print every entity's signature, to see what the game has.
 //! 3. `dump`    print one record as JSON, to find a moved field after a patch.
+//! 4. `export`  save the decompressed Game2.dcb, to debug the parser offline.
 
 use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Context, Result};
 use clap::{Parser, Subcommand};
 use rockhound_core::SignatureDb;
-use rockhound_sigextract::{entities, game_version, load, report, resolve_input, table};
+use rockhound_sigextract::{entities, game_version, load, read_dcb, report, resolve_input, table};
 
 #[derive(Parser)]
 #[command(version, about)]
@@ -47,12 +48,23 @@ enum Cmd {
         #[arg(long, default_value_t = 4)]
         depth: u32,
     },
+    /// Save the decompressed Game2.dcb without parsing it.
+    Export {
+        #[arg(long, default_value = "Game2.dcb")]
+        out: PathBuf,
+    },
 }
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
     let input = resolve_input(&cli.game);
     eprintln!("Reading {} ...", input.display());
+    if let Cmd::Export { out } = &cli.command {
+        let bytes = read_dcb(&input)?;
+        std::fs::write(out, &bytes).with_context(|| format!("cannot write {}", out.display()))?;
+        println!("Wrote {} ({} bytes).", out.display(), bytes.len());
+        return Ok(());
+    }
     let db = load(&input)?;
     match cli.command {
         Cmd::Update {
@@ -65,6 +77,7 @@ fn main() -> Result<()> {
             print!("{}", report::entity_tsv(&found, filter.as_deref()));
             Ok(())
         }
+        Cmd::Export { .. } => unreachable!("handled before parsing"),
         Cmd::Dump { name, depth } => {
             let mut shown = 0;
             for rec in db.records().filter(|r| r.name.contains(&name)) {
