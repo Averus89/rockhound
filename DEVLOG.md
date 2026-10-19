@@ -25,6 +25,15 @@ plugin against GitHub Releases, which works because the repo is public.
 - Copies older than v0.8.0 have no updater; they need this one installed by
   hand once.
 
+## 2026-10-19: Website
+
+One-page static site in `site/`, built from the promo kit (colours, type and
+motion tokens). Hero with an animated overlay readout, how a read works, the
+main window, a "Try a number" lookup using the signature table, download and
+donation links, credits and the fan-made disclaimer. No build step and no
+app change, so no version bump. `pages.yml` publishes `site/` to GitHub
+Pages when it changes on main.
+
 ## 2026-10-19: Signature table from SC 4.10.2
 
 First `sigextract update` run on Alan's PC against the live game. Every
