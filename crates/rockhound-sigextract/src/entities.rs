@@ -116,7 +116,8 @@ fn by_path(db: &DataCore, params: &[(String, Value)]) -> Result<Option<Vec<f32>>
             None => return Ok(None),
         }
     }
-    channels(db, get(&node, SIGNATURES))
+    // A short array here means the real one moved, so let the search run.
+    Ok(channels(db, get(&node, SIGNATURES))?.filter(|c| c.len() > CROSS_SECTION))
 }
 
 /// Find the first `signatures` array long enough to hold the cross section,
@@ -367,6 +368,14 @@ pub(crate) mod tests {
         let (found, scan) = entity_signatures(&db).unwrap();
         assert_eq!(scan.searched, 1);
         assert_eq!(found[0].channels, vec![9.0, 0.0, 0.0, 0.0, 0.0, 2400.0]);
+    }
+
+    #[test]
+    fn skips_short_arrays_at_the_known_path() {
+        let db = DataCore::parse(game(&[("Short", "s.xml", Some(vec![1.0, 2.0]))])).unwrap();
+        let (found, scan) = entity_signatures(&db).unwrap();
+        assert!(found.is_empty());
+        assert_eq!(scan.with_signature, 0);
     }
 
     #[test]

@@ -81,8 +81,12 @@ The tool is built to keep working when CIG reshuffles the data:
 
 When CIG changes the format beyond that, the parser stops with an error
 rather than writing wrong values. Developers can check a new patch with
-`SIGEXTRACT_GAME=<Data.p4k or Game2.dcb> cargo test -p rockhound-sigextract -- --ignored`,
-which fails if any table row is no longer found.
+this test, which fails if any table row is no longer found:
+
+```powershell
+$env:SIGEXTRACT_GAME = "G:\StarCitizen\LIVE\Data.p4k"
+cargo test --release -p rockhound-sigextract -- --ignored
+```
 
 ## When something looks wrong
 
