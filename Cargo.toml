@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/rockhound-core", "crates/rockhound-replay", "app/src-tauri"]
+members = ["crates/rockhound-core", "crates/rockhound-replay", "crates/rockhound-sigextract", "app/src-tauri"]
 
 [workspace.package]
 version = "0.7.0"

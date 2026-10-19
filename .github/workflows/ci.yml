@@ -52,7 +52,7 @@ jobs:
       - name: Test with coverage gate
         run: >
           cargo llvm-cov --workspace --fail-under-lines 85
-          --ignore-filename-regex '(rockhound-replay/src/main\.rs|src-tauri/src/(main|lib)\.rs)'
+          --ignore-filename-regex '(rockhound-(replay|sigextract)/src/main\.rs|src-tauri/src/(main|lib)\.rs)'
 
   # Drives the built app through WebDriver with a recorded game standing in
   # for Star Citizen, as a player would: start, read, stop, settings.
@@ -125,11 +125,14 @@ jobs:
       - name: Build app
         working-directory: app
         run: npx tauri build
+      # The game-data extractor, for refreshing data/signatures.json.
+      - run: cargo build --release -p rockhound-sigextract
       - uses: actions/upload-artifact@v7
         with:
           name: rockhound-windows
           path: |
             target/release/rockhound-app.exe
+            target/release/sigextract.exe
             target/release/bundle/nsis/*.exe
           if-no-files-found: error
 

@@ -1,0 +1,21 @@
+[package]
+name = "rockhound-sigextract"
+description = "Extract signature values from Star Citizen game files into data/signatures.json"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "sigextract"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+clap.workspace = true
+rockhound-core = { path = "../rockhound-core" }
+ruzstd = "0.9"
+serde_json.workspace = true
+thiserror.workspace = true

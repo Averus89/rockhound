@@ -4,7 +4,10 @@
 
 `data/signatures.json` was converted from the signature database of
 SC Signature Scanner (https://github.com/Averus89/SC_Signature_Scanner),
-originally by Mallachi, used under the MIT License:
+originally by Mallachi. Its values are now refreshed from the game files by
+`crates/rockhound-sigextract`, which follows the extraction method Mallachi
+documented in that project (`SignatureValue.md`). Both are used under the
+MIT License:
 
 > Copyright (c) 2026 Mallachi
 > Copyright (c) 2026 Averus89
