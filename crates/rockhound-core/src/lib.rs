@@ -15,7 +15,7 @@ pub mod signatures;
 
 pub use recognize::{GlyphRead, TemplateSet};
 pub use resolve::{resolve, Resolved, Voter};
-pub use signatures::{SignatureDb, SignatureMatch};
+pub use signatures::{Location, SignatureDb, SignatureMatch};
 
 /// The digit line of a crop, scaled for [`TemplateSet`], or `None` when the
 /// crop holds nothing that looks like text.

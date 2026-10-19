@@ -53,6 +53,31 @@ pub enum Category {
     Salvage,
 }
 
+impl Category {
+    /// Where this kind of object can be found, or `None` for both.
+    /// Ground deposits only exist on planet and moon surfaces; salvage is
+    /// wreckage in space. Ship-mining rocks are both asteroids and surface
+    /// rocks, so they never move when the player's location changes.
+    pub fn found_in(self) -> Option<Location> {
+        match self {
+            Self::ShipMining => None,
+            Self::GroundDeposit => Some(Location::Planet),
+            Self::Salvage => Some(Location::Space),
+        }
+    }
+}
+
+/// Where the player is scanning. Values like 3000 are both a ground deposit
+/// and a capital wreck, so knowing this picks the likely one.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Location {
+    #[default]
+    Unknown,
+    Space,
+    Planet,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct SignatureMatch {
     pub name: String,
@@ -107,6 +132,14 @@ impl SignatureDb {
         out
     }
 
+    /// [`Self::matches`], with sources that don't belong at `location`
+    /// moved to the end. They stay listed, since the location may be wrong.
+    pub fn matches_at(&self, value: u32, location: Location) -> Vec<SignatureMatch> {
+        let mut out = self.matches(value);
+        rank_for(&mut out, location);
+        out
+    }
+
     /// Ways rocks of two different minerals could add up to `value`, fewest
     /// rocks first, then same-tier pairs (they tend to share a field).
     /// Only ship-mining sources mix; each pair lists its smaller base first.
@@ -149,6 +182,14 @@ impl SignatureDb {
         self.sources
             .iter()
             .any(|s| value.is_multiple_of(s.base) && (1..=s.max_count).contains(&(value / s.base)))
+    }
+}
+
+/// Move matches that don't belong at `location` to the end, keeping the
+/// order within each group.
+fn rank_for(matches: &mut [SignatureMatch], location: Location) {
+    if location != Location::Unknown {
+        matches.sort_by_key(|m| m.category.found_in().is_some_and(|l| l != location));
     }
 }
 
@@ -195,6 +236,39 @@ pub(crate) mod tests {
         let m = sample_db().matches(6000);
         let names: Vec<&str> = m.iter().map(|m| m.name.as_str()).collect();
         assert_eq!(names, vec!["Small Ground Deposit", "Salvage Panels"]);
+    }
+
+    #[test]
+    fn location_ranks_colliding_sources_without_dropping_any() {
+        let db = SignatureDb::from_json(include_str!("../../../data/signatures.json")).unwrap();
+        let names = |value, location| -> Vec<String> {
+            db.matches_at(value, location)
+                .into_iter()
+                .map(|m| m.name)
+                .collect()
+        };
+        // Single objects first when the location is unknown, as before.
+        assert_eq!(
+            names(3000, Location::Unknown),
+            ["Small Ground Deposit", "Capital Wreck Debris"]
+        );
+        assert_eq!(
+            names(3000, Location::Space),
+            ["Capital Wreck Debris", "Small Ground Deposit"]
+        );
+        assert_eq!(
+            names(4000, Location::Space),
+            ["Salvage Panels", "Large Ground Deposit"]
+        );
+        assert_eq!(
+            names(4000, Location::Planet),
+            ["Large Ground Deposit", "Salvage Panels"]
+        );
+        // Ship rocks are found everywhere, so they keep their place.
+        assert_eq!(
+            names(12720, Location::Space),
+            names(12720, Location::Planet)
+        );
     }
 
     #[test]

@@ -22,7 +22,7 @@ use std::sync::{Arc, Mutex, RwLock};
 use std::time::Duration;
 
 use rockhound_core::recognize::TemplateError;
-use rockhound_core::{SignatureDb, TemplateSet};
+use rockhound_core::{Location, SignatureDb, TemplateSet};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State, WebviewWindowBuilder, WindowEvent};
 
@@ -50,6 +50,9 @@ struct AppState {
     paths: Paths,
     db: Arc<RwLock<SignatureDb>>,
     settings: Mutex<Settings>,
+    /// The scan loop's copy of `settings.location`, so a change re-ranks
+    /// the shown reading without restarting the scan.
+    location: Arc<RwLock<Location>>,
     scanner: Mutex<Option<ScannerHandle>>,
 }
 
@@ -94,6 +97,7 @@ fn save_settings(
     // The file is written, so memory must match it even if the overlay
     // can't be shown; otherwise a restart would apply different settings.
     let shown = overlay::set_visible(&app, settings.overlay);
+    *state.location.write().unwrap_or_else(|e| e.into_inner()) = settings.location;
     *lock(&state.settings) = settings;
     shown
 }
@@ -118,6 +122,7 @@ fn start_scan(app: AppHandle, state: State<'_, AppState>) -> Result<(), String> 
         source,
         reader,
         Arc::clone(&state.db),
+        Arc::clone(&state.location),
         interval,
         move |reading| {
             let _ = reading_app.emit("reading", reading);
@@ -215,10 +220,12 @@ pub fn run() {
             let db = sync::load_local(&paths.signature_cache);
             let settings = Settings::load(&paths.settings);
             let show_overlay = settings.overlay;
+            let location = Arc::new(RwLock::new(settings.location));
             app.manage(AppState {
                 paths,
                 db: Arc::new(RwLock::new(db)),
                 settings: Mutex::new(settings),
+                location,
                 scanner: Mutex::new(None),
             });
             // Windows are created here, after the state exists, because

@@ -3,6 +3,9 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 export type Category = "ship_mining" | "ground_deposit" | "salvage";
 
+/** Where the player is scanning; ranks colliding signatures. */
+export type Location = "unknown" | "space" | "planet";
+
 export interface SignatureMatch {
   name: string;
   category: Category;
@@ -27,6 +30,7 @@ export interface Settings {
   intervalMs: number;
   overlay: boolean;
   debug: boolean;
+  location: Location;
 }
 
 export interface Status {

@@ -1,7 +1,7 @@
 import { Badge, Box, Group, Paper, Stack, Text } from "@mantine/core";
 import { IconRadar } from "@tabler/icons-react";
 
-import type { Reading } from "./api";
+import type { Location, Reading } from "./api";
 import { CategoryIcon } from "./CategoryIcon";
 import {
   CATEGORY_LABEL,
@@ -9,11 +9,18 @@ import {
   formatSignature,
   matchLabel,
   mixLabel,
+  needsLocation,
   tierColor,
   unmatchedLabel,
 } from "./format";
 
-export function Readout({ reading, scanning }: { reading: Reading | null; scanning: boolean }) {
+interface Props {
+  reading: Reading | null;
+  scanning: boolean;
+  location: Location;
+}
+
+export function Readout({ reading, scanning, location }: Props) {
   if (!reading || reading.value === null) {
     return (
       <Paper className="rh-panel" p="xl" radius="lg">
@@ -96,6 +103,11 @@ export function Readout({ reading, scanning }: { reading: Reading | null; scanni
             <Text size="xs" c="dimmed" mb={4}>
               Could also be: {others.map(matchLabel).join(", ")}
             </Text>
+            {needsLocation(reading.matches, location) && (
+              <Text size="xs" c="yellow.5">
+                Choose where you are above to rank these.
+              </Text>
+            )}
           </Box>
         )}
       </Stack>

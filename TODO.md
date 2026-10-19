@@ -31,6 +31,10 @@
 - [ ] Overlay e2e check (needs a second window handle in the spec)
 - [ ] Run e2e on Windows too (msedgedriver must match the runner's WebView2)
 
+## Location context
+- [x] Manual space / planet switch ranks colliding signatures
+- [ ] Detect space vs planet automatically (Game.log or HUD cue)
+
 ## Known issues
 - Lines are scaled to 24 px, so templates carry across HUD scales, but a
   different font weight (e.g. 4K UI scale) may still need its own samples.

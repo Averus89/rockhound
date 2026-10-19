@@ -1,5 +1,26 @@
 # Devlog
 
+## 2026-10-19: v0.7.0, space or planet
+
+Alan pointed out that some signatures collide across locations: 3000 is a
+small ground deposit or a capital (890 Jump) wreck, 4000 a large ground
+deposit or two salvage panels. Which one it is depends on where the player is.
+
+- Main window has a "Where you are" switch: Anywhere, In space, On a planet.
+  It is saved with the settings (`location`) and applies to the shown reading
+  at once, without restarting the scan.
+- Ground deposits belong on planets and salvage in space
+  (`Category::found_in`); ship-mining rocks are both asteroids and surface
+  rocks, so they never move. `SignatureDb::matches_at` moves sources that
+  don't belong at the location to the end of the list. Nothing is hidden, so
+  a wrong setting still shows the right answer under "Could also be".
+- Anywhere keeps the old order and, when the matches split by location, says
+  to choose where you are.
+- No schema change to `data/signatures.json`; location comes from the
+  existing categories.
+- Detection is manual for now. Automatic detection needs a signal from the
+  game (Game.log or the HUD), still to be found.
+
 ## 2026-10-18: License change, contributing guide and security policy
 
 Alan asked for a license that stops others copying and monetizing forks, plus

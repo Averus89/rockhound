@@ -2,6 +2,7 @@
 
 use std::path::Path;
 
+use rockhound_core::Location;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -16,6 +17,8 @@ pub struct Settings {
     pub overlay: bool,
     /// Save what the scanner sees, for bug reports.
     pub debug: bool,
+    /// Where the player is, so colliding signatures rank the likely one first.
+    pub location: Location,
 }
 
 impl Default for Settings {
@@ -25,6 +28,7 @@ impl Default for Settings {
             interval_ms: 250,
             overlay: false,
             debug: false,
+            location: Location::Unknown,
         }
     }
 }
@@ -61,6 +65,7 @@ mod tests {
             interval_ms: 100,
             overlay: true,
             debug: true,
+            location: Location::Planet,
         };
         s.save(&path).unwrap();
         assert_eq!(Settings::load(&path), s);

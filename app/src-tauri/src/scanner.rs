@@ -7,7 +7,7 @@ use std::thread::JoinHandle;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use image::RgbaImage;
-use rockhound_core::{SignatureDb, SignatureMatch, Voter};
+use rockhound_core::{Location, SignatureDb, SignatureMatch, Voter};
 use serde::Serialize;
 
 use crate::reader::Reader;
@@ -68,7 +68,8 @@ pub fn next_png(frames: &[PathBuf], next: &mut usize) -> Result<RgbaImage, Strin
 /// How long a shown value stays up while frames stop confirming it.
 const SHOW_HOLD: Duration = Duration::from_secs(3);
 
-/// Sent to the UI whenever the shown value changes.
+/// Sent to the UI whenever the shown value changes, and again (same `at`)
+/// when a location change reorders its matches.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Reading {
@@ -102,11 +103,13 @@ impl ScannerHandle {
 }
 
 /// Start the scan loop on its own thread. `on_reading` gets every change of
-/// the voted value; `on_stop` gets the error that ended the loop, if any.
+/// the voted value or of its ranking; `on_stop` gets the error that ended
+/// the loop, if any.
 pub fn spawn(
     mut source: Box<dyn FrameSource>,
     mut reader: Reader,
     db: Arc<RwLock<SignatureDb>>,
+    location: Arc<RwLock<Location>>,
     interval: Duration,
     on_reading: impl Fn(Reading) + Send + 'static,
     on_stop: impl FnOnce(Option<String>) + Send + 'static,
@@ -116,23 +119,36 @@ pub fn spawn(
     let thread = std::thread::spawn(move || {
         let hold = (SHOW_HOLD.as_millis() / interval.as_millis().max(1)) as usize;
         let mut voter = Voter::new(3, 2).hold(hold);
-        let mut shown: Option<u32> = None;
+        let mut shown: Option<Reading> = None;
+        let mut ranked_for = Location::Unknown;
         let mut error = None;
         while !stop_flag.load(Ordering::Relaxed) {
             match source.next_crop() {
                 Ok(crop) => {
                     let db = db.read().unwrap_or_else(|e| e.into_inner());
+                    let here = *location.read().unwrap_or_else(|e| e.into_inner());
                     let resolved = crop.and_then(|c| reader.read(&c, &db));
                     let value = voter.push(resolved.as_ref().and_then(|r| r.value));
-                    if value != shown {
-                        shown = value;
-                        let matches = value.map(|v| db.matches(v)).unwrap_or_default();
+                    if value != shown.as_ref().and_then(|r| r.value) {
+                        let matches = value.map(|v| db.matches_at(v, here)).unwrap_or_default();
                         let mixes = match value {
                             Some(v) if matches.is_empty() => db.mixes(v),
                             _ => Vec::new(),
                         };
-                        on_reading(to_reading(value, matches, mixes, resolved));
+                        let reading = to_reading(value, matches, mixes, resolved);
+                        on_reading(reading.clone());
+                        shown = Some(reading);
+                    } else if here != ranked_for {
+                        // Same value and time, so the UI updates it in place
+                        // instead of logging a new reading.
+                        if let Some(reading) = shown.as_mut() {
+                            if let Some(v) = reading.value {
+                                reading.matches = db.matches_at(v, here);
+                                on_reading(reading.clone());
+                            }
+                        }
                     }
+                    ranked_for = here;
                 }
                 Err(e) => {
                     error = Some(e);
@@ -182,22 +198,39 @@ mod tests {
         "/../../crates/rockhound-core/tests/fixtures/hud_17200_pin.png"
     );
 
-    /// Serves the same real crop a few times, then fails.
-    struct Frames(usize);
+    /// Serves the same real crop a few times, then fails. Moves the player
+    /// to `move_to` once `move_at` frames are left.
+    struct Frames {
+        left: usize,
+        move_at: usize,
+        move_to: (Arc<RwLock<Location>>, Location),
+    }
+
+    impl Frames {
+        fn new(left: usize) -> Self {
+            Self {
+                left,
+                move_at: usize::MAX,
+                move_to: (Arc::default(), Location::Unknown),
+            }
+        }
+    }
 
     impl FrameSource for Frames {
         fn next_crop(&mut self) -> Result<Option<RgbaImage>, String> {
-            if self.0 == 0 {
+            if self.left == 0 {
                 return Err("out of frames".into());
             }
-            self.0 -= 1;
+            if self.left == self.move_at {
+                *self.move_to.0.write().unwrap() = self.move_to.1;
+            }
+            self.left -= 1;
             Ok(Some(image::open(CROP).unwrap().to_rgba8()))
         }
     }
 
-    #[test]
-    fn reports_the_voted_value_once_and_the_stop_reason() {
-        let db = SignatureDb::from_json(include_str!("../../../data/signatures.json")).unwrap();
+    /// Run the loop on `frames` of the 17,200 crop; every reading it sent.
+    fn scan(frames: Frames, db: SignatureDb, location: Arc<RwLock<Location>>) -> Vec<Reading> {
         let mut templates = TemplateSet::default();
         learn_crop(
             &image::open(CROP).unwrap().to_rgba8(),
@@ -207,9 +240,10 @@ mod tests {
         let (readings, got_readings) = mpsc::channel();
         let (stopped, got_stop) = mpsc::channel();
         let handle = spawn(
-            Box::new(Frames(3)),
+            Box::new(frames),
             Reader::new(templates, TemplateSet::default(), None, None),
             Arc::new(RwLock::new(db)),
+            location,
             Duration::from_millis(1),
             move |r| readings.send(r).unwrap(),
             move |e| stopped.send(e).unwrap(),
@@ -217,10 +251,41 @@ mod tests {
         let stop_reason = got_stop.recv_timeout(Duration::from_secs(5)).unwrap();
         handle.stop();
         assert_eq!(stop_reason.as_deref(), Some("out of frames"));
-        let shown: Vec<_> = got_readings.try_iter().collect();
+        got_readings.try_iter().collect()
+    }
+
+    #[test]
+    fn reports_the_voted_value_once_and_the_stop_reason() {
+        let db = SignatureDb::from_json(include_str!("../../../data/signatures.json")).unwrap();
+        let shown = scan(Frames::new(3), db, Arc::default());
         assert_eq!(shown.len(), 1, "only the change is reported");
         assert_eq!(shown[0].value, Some(17200));
         assert_eq!(shown[0].raw, "17,200");
         assert!(!shown[0].matches.is_empty());
+    }
+
+    #[test]
+    fn a_location_change_reranks_the_shown_reading_in_place() {
+        // 17,200 is both four ground deposits and two wrecks here.
+        let db = SignatureDb::from_json(
+            r#"{
+                "schema": 1, "data_version": "2026.01.01", "sc_version": "4.7",
+                "sources": [
+                    {"name": "Deposit", "category": "ground_deposit", "base": 4300, "max_count": 10},
+                    {"name": "Wreck", "category": "salvage", "base": 8600, "max_count": 10}
+                ]
+            }"#,
+        )
+        .unwrap();
+        let location = Arc::new(RwLock::new(Location::Planet));
+        let frames = Frames {
+            left: 6,
+            move_at: 2,
+            move_to: (Arc::clone(&location), Location::Space),
+        };
+        let shown = scan(frames, db, location);
+        let best: Vec<&str> = shown.iter().map(|r| r.matches[0].name.as_str()).collect();
+        assert_eq!(best, ["Deposit", "Wreck"]);
+        assert_eq!(shown[0].at, shown[1].at, "same reading, re-ranked");
     }
 }
