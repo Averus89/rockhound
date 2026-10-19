@@ -182,6 +182,7 @@ jobs:
           assets=$(gh release view "v$version" --json isDraft,assets \
             --jq 'select(.isDraft | not) | .assets[].name' 2>/dev/null || true)
           if grep -qxF "Rockhound_${version}_x64-setup.exe" <<< "$assets" &&
+             grep -qxF "Rockhound_${version}_x64-setup.exe.sig" <<< "$assets" &&
              grep -qxF "Rockhound_${version}_portable.exe" <<< "$assets" &&
              grep -qxF "latest.json" <<< "$assets"; then
             echo "v$version is already released."
