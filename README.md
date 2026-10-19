@@ -15,6 +15,9 @@ Early. What exists now:
 - `crates/rockhound-core`: readout pipeline (cleanup, glyph split, template
   matching, signature table lookup, frame voting).
 - `crates/rockhound-replay`: tool to test the pipeline against reference videos.
+- `crates/rockhound-sigextract`: `sigextract`, which refreshes
+  `data/signatures.json` from the game's `Data.p4k` after a patch. See its
+  [README](crates/rockhound-sigextract/README.md).
 - `app/`: Tauri desktop app. Main window with the current reading, its best
   match and recent reads; settings for the readout box and read interval.
   Live capture of the game window on Windows, and an overlay.

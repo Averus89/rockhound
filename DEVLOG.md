@@ -1,5 +1,32 @@
 # Devlog
 
+## 2026-10-19: Signature extractor for game files
+
+Alan asked for a way to take signature values straight from the game files
+after each patch, as SC Signature Scanner did, so he can run it and push the
+result. Mallachi's extractor scripts were never committed upstream, only
+their notes (`SignatureValue.md`), so this is a new implementation of the
+same method. No app change, so no version bump.
+
+- New crate `crates/rockhound-sigextract`, binary `sigextract`. Reads
+  `Data/Game2.dcb` from `Data.p4k` itself (ZIP64, CIG local headers,
+  Zstandard via the pure-Rust `ruzstd`), parses DataCore and follows
+  `Components -> SSCSignatureSystemParams -> radarProperties ->
+  baseSignatureParams -> signatures[4]` for every entity.
+- `update` merges the values into `data/signatures.json`: each row takes the
+  most common value among the entities whose names match it, keeps names,
+  tiers and `max_count`, and stamps `data_version`/`sc_version` only when
+  something changed. The report lists changed rows, rows nothing matched,
+  disagreeing entities and scannable entities no row claims.
+- `list` prints every entity signature as TSV and `dump` prints a record as
+  JSON, for tuning the name rules and following layout changes.
+- The parser checks that every struct's fields add up to its declared size
+  and that the data section ends at the end of the file, so a format change
+  fails loudly instead of producing wrong values.
+- Tested against synthetic archives and databases only; the first run on a
+  real install may need the name rules tuned.
+- CI builds `sigextract.exe` into the `rockhound-windows` artifact.
+
 ## 2026-10-18: License change, contributing guide and security policy
 
 Alan asked for a license that stops others copying and monetizing forks, plus
