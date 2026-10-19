@@ -238,6 +238,10 @@ impl DataCore {
             .map(|_| {
                 let name = c.u32()?;
                 let file_name = c.u32()?;
+                // Version 8 (SC 4.x) adds a string offset after the file name.
+                if version >= 8 {
+                    c.take(4)?;
+                }
                 let struct_index = c.u32()?;
                 c.take(16)?;
                 let instance = c.u16()?;
@@ -721,11 +725,15 @@ pub(crate) mod tests {
                 }
             }
             let mut records = Vec::new();
+            let record_count = self.records.len() as u32;
             for (name, file, struct_index, instance) in std::mem::take(&mut self.records) {
                 let name = intern(&mut self.text2, &name);
                 let file = intern(&mut self.text1, &file);
                 records.extend_from_slice(&name.to_le_bytes());
                 records.extend_from_slice(&file.to_le_bytes());
+                if self.version >= 8 {
+                    records.extend_from_slice(&[0xcd; 4]);
+                }
                 records.extend_from_slice(&struct_index.to_le_bytes());
                 records.extend_from_slice(&[0xab; 16]);
                 records.extend_from_slice(&instance.to_le_bytes());
@@ -744,7 +752,7 @@ pub(crate) mod tests {
             header[4] = self.structs.len() as u32;
             header[5] = u32::from(prop_count);
             header[7] = mappings.len() as u32;
-            header[8] = (records.len() / 32) as u32;
+            header[8] = record_count;
             header[12] = self.int32s.len() as u32;
             header[18] = self.singles.len() as u32;
             header[24] = self.strongs.len() as u32;
@@ -801,7 +809,12 @@ pub(crate) mod tests {
     /// A database exercising every scalar type, inheritance, inline classes,
     /// arrays and pointers.
     fn sample() -> DataCore {
+        sample_version(6)
+    }
+
+    fn sample_version(version: u32) -> DataCore {
         let mut b = Builder::new();
+        b.version = version;
         let base = b.add_struct(S {
             name: "Base",
             parent: NONE,
@@ -927,6 +940,15 @@ pub(crate) mod tests {
         assert_eq!(json["r"].as_str().unwrap().len(), 40);
         let shallow = db.to_json(rec.ptr, 0).unwrap();
         assert_eq!(shallow["strong"], "Inner[0]");
+    }
+
+    #[test]
+    fn reads_version_8_records() {
+        let db = sample_version(8);
+        let rec = db.records().next().unwrap();
+        assert_eq!(rec.name, "All.Thing");
+        assert_eq!(rec.file_name, "libs/thing.xml");
+        assert_eq!(db.field(rec.ptr, "id").unwrap(), Some(Value::UInt(42)));
     }
 
     #[test]

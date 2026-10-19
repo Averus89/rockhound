@@ -17,6 +17,13 @@ pub fn merge_report(m: &Merge) -> String {
             line(format!("  {:<22} {} -> {}", c.name, c.old, c.new));
         }
     }
+    if !m.added.is_empty() {
+        line("Added (new minerals; check tier and max_count):".into());
+        for s in m.table.sources.iter().filter(|s| m.added.contains(&s.name)) {
+            let tier = s.tier.as_deref().unwrap_or("-");
+            line(format!("  {:<22} {} ({tier})", s.name, s.base));
+        }
+    }
     if !m.confirmed.is_empty() {
         line(format!("Confirmed unchanged: {} rows", m.confirmed.len()));
     }
@@ -33,7 +40,7 @@ pub fn merge_report(m: &Merge) -> String {
         }
     }
     if !m.unclaimed.is_empty() {
-        line("Mining/salvage-looking entities no row claimed:".into());
+        line("Mining/salvage entities no rule covers:".into());
         for g in &m.unclaimed {
             let known = m
                 .table
@@ -97,10 +104,11 @@ mod tests {
         let m = merge(
             &table,
             &[
-                entity("MineableRock_Gold_A", 3590.0),
-                entity("MineableRock_Gold_B", 3585.0),
-                entity("MineableRock_Gold_C", 3590.0),
-                entity("Wreck_Small", 1700.0),
+                entity("MineableRock_AsteroidRare_Gold", 3590.0),
+                entity("MineableRock_SurfaceRare_Gold", 3585.0),
+                entity("MineableRock_SurfaceRare_Gold_RCD", 3590.0),
+                entity("MineableRock_AsteroidRare_Newite", 3615.0),
+                entity("SalvageableDebris_Hull", 1700.0),
             ],
             None,
             "2099.01.01",
@@ -113,8 +121,17 @@ mod tests {
         assert!(text.contains("Gold: 3590 (x2), 3585 (x1)"), "{text}");
         assert!(text.contains("Quantainium"), "{text}");
         assert!(text.contains("(same as Small Wreck Debris)"), "{text}");
+        assert!(
+            text.contains("Newite                 3615 (rare)"),
+            "{text}"
+        );
 
-        let m = merge(&table, &[entity("MineableRock_Iron", 4270.0)], None, "x");
+        let m = merge(
+            &table,
+            &[entity("MineableRock_AsteroidCommon_Iron", 4270.0)],
+            None,
+            "x",
+        );
         let text = merge_report(&m);
         assert!(text.starts_with("No signature values changed."), "{text}");
         assert!(text.contains("Confirmed unchanged: 1 rows"), "{text}");

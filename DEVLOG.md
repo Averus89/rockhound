@@ -23,9 +23,16 @@ same method. No app change, so no version bump.
   saves the decompressed Game2.dcb for offline debugging.
 - The parser checks that every struct's fields add up to its declared size
   and that the data section ends at the end of the file, so a format change
-  fails loudly instead of producing wrong values.
-- Tested against synthetic archives and databases only; the first run on a
-  real install may need the name rules tuned.
+  fails loudly instead of producing wrong values. That check caught the
+  first real run: SC 4.7 ships DataCore version 8, whose records carry an
+  extra 4-byte string offset after the file name (36 bytes, not 32).
+- Checked against Alan's SC 4.7 LIVE Game2.dcb: 29,693 entities, 5,849 with
+  signatures, and all 33 rows of the current table confirmed unchanged.
+  Name rules follow the real entity names (`MineableRock_Asteroid<Tier>_*`,
+  `MineableRock_Surface<Tier>_*`, `MineableRock_FPS_*`,
+  `MineableRock_GroundVehicle_*`, salvage panels and `SalvageableDebris_<Ship>`);
+  legacy rock types, tests and templates are ignored. A mineral the table
+  lacks is added with its tier from the entity name.
 - CI builds `sigextract.exe` into the `rockhound-windows` artifact.
 
 ## 2026-10-18: License change, contributing guide and security policy

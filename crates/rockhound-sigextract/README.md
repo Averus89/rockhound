@@ -44,19 +44,25 @@ with today's date, but only when something changed.
 
 - **Changed**: rows whose value in the game differs from the table. These
   are written to the file.
+- **Added**: minerals the game has but the table doesn't. They get their
+  tier from the entity name and `max_count` 100; check both.
 - **No entity matched these rows**: the tool could not tell which game
-  entities belong to the row, so the old value is kept. Wreck debris rows
-  always land here for now, since their entity names are not known yet.
+  entities belong to the row, so the old value is kept. Usually means CIG
+  renamed the entities; `list` shows the new names.
 - **Rows whose entities disagree**: the row's entities have more than one
   value; the most common one is used. Worth a look in game.
-- **Entities no row claimed**: mining or salvage looking entities that no row
-  covers, grouped by value. A new mineral shows up here; add a row for it by
-  hand (name, category, tier, `max_count`) and run `update` again.
+- **Entities no rule covers**: mining or salvage entities none of the rules
+  below recognize, grouped by value, such as debris from a new wreck type.
+  Add a rule in `src/table.rs` if one belongs in the table.
 
-Rows are matched by entity name: ship rocks by a mineral name in the record
-name (`MineableRock_..._Gold`), ground deposits by `FPS` (small) and
-`GroundVehicle` (large), salvage panels by `SalvageScrap`/`SalvageLock`.
-The rules are in `src/table.rs`.
+Rows are matched by entity name (SC 4.7 naming):
+`MineableRock_Asteroid<Tier>_<Mineral>` and `MineableRock_Surface<Tier>_<Mineral>`
+for ship mining, `MineableRock_FPS_*` and `MineableRock_GroundVehicle_*` for
+small and large ground deposits, `SalvageScrap*`, `SalvageLock*` and
+`SalvageableRepairable_*` for panels, and `SalvageableDebris_<Ship>`
+(Avenger Titan, Ares Inferno, C2, 890 Jump) for wreck debris. Older rock
+entities (`AsteroidCTypeMineableRock`, `GraniteMineableRock_*`), tests and
+templates are ignored.
 
 ## When something looks wrong
 
