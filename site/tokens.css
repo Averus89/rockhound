@@ -1,0 +1,64 @@
+/*
+ * Rockhound brand tokens, v1 (2026-10-19).
+ * Matches the app's dark Mantine theme (app/src/theme.ts, app/src/styles.css)
+ * so the website and the app read as one product.
+ *
+ * Fonts (Google Fonts):
+ *   https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap
+ */
+:root {
+  /* Grounds, darkest to lightest */
+  --rh-void: #0d0e13;
+  --rh-deep: #12141b;
+  --rh-hull: #1d2230;
+  --rh-plate: #262b38;
+  --rh-panel: rgba(255, 255, 255, 0.035);
+  --rh-border: rgba(255, 255, 255, 0.07);
+  --rh-bg: radial-gradient(120% 80% at 50% -10%, #1d2230 0%, #12141b 55%, #0d0e13 100%);
+
+  /* Text (all pass 4.5:1 on --rh-void and --rh-deep) */
+  --rh-text: #eceef2;
+  --rh-text-2: #b4b9c4;
+  --rh-text-3: #8a909e;
+
+  /* Ember accent: the in-game map pin orange. 4 is the brand colour. */
+  --rh-ember-0: #fff3e6;
+  --rh-ember-1: #ffe3c7;
+  --rh-ember-2: #ffc48c;
+  --rh-ember-3: #ffa24d;
+  --rh-ember-4: #ff8a1f;
+  --rh-ember-5: #ff7a05;
+  --rh-ember-6: #e86a00;
+  --rh-ember-7: #c25800;
+  --rh-ember-8: #9c4700;
+  --rh-ember-9: #7a3700;
+  --rh-ember: var(--rh-ember-4);
+  --rh-ember-hi: var(--rh-ember-3);
+  --rh-ember-lo: var(--rh-ember-6);
+  --rh-on-ember: #0d0e13;
+  --rh-glow: 0 0 24px rgba(255, 138, 31, 0.35);
+
+  /* Signals */
+  --rh-scan: #3dd6b5;
+  --rh-alert: #e5484d;
+
+  /* Rarity tiers (Mantine 6 shades, same mapping as the app) */
+  --rh-tier-common: #868e96;
+  --rh-tier-uncommon: #12b886;
+  --rh-tier-rare: #228be6;
+  --rh-tier-epic: #be4bdb;
+  --rh-tier-legendary: #fab005;
+
+  /* Type */
+  --rh-font-display: "Chakra Petch", system-ui, sans-serif;
+  --rh-font-body: "Inter", system-ui, sans-serif;
+  --rh-font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  /* Shape and motion */
+  --rh-radius-sm: 8px;
+  --rh-radius-md: 12px;
+  --rh-radius-lg: 20px;
+  --rh-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --rh-dur-fast: 220ms;
+  --rh-dur-slow: 600ms;
+}

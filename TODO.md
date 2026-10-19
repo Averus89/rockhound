@@ -41,3 +41,10 @@
 - Lines are scaled to 24 px, so templates carry across HUD scales, but a
   different font weight (e.g. 4K UI scale) may still need its own samples.
 - Windows OCR quality on 11 px digits is unknown; it reads a 4x upscale.
+
+## Website
+- [x] One-page static site in `site/`
+- [x] GitHub Pages deploy workflow (`pages.yml`)
+- [ ] Switch Pages source to GitHub Actions in repo settings (Alan)
+- [ ] Final tagline ("Know the rock before you land." is a placeholder)
+- [ ] Social preview image for link cards

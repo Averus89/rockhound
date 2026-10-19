@@ -1,0 +1,932 @@
+/*
+ * Rockhound site. One dark look on purpose: it matches the app and the HUD.
+ * Colours, type and motion come from tokens.css (the promo kit tokens).
+ * Layout: sticky bar, hero with the overlay demo, then alternating bands.
+ */
+
+:root {
+  color-scheme: dark;
+  --gutter: max(16px, env(safe-area-inset-left, 0px));
+  --gutter-r: max(16px, env(safe-area-inset-right, 0px));
+  --max: 1120px;
+  --step--1: 0.875rem;
+  --step-0: 1.0625rem;
+  --step-1: 1.25rem;
+  --step-2: clamp(1.75rem, 1.2rem + 2vw, 2.5rem);
+  --step-3: clamp(2.5rem, 1.6rem + 4vw, 4.25rem);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 72px;
+  background: var(--rh-void);
+}
+
+body {
+  margin: 0;
+  background: var(--rh-void);
+  color: var(--rh-text);
+  font-family: var(--rh-font-body);
+  font-size: var(--step-0);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0 0 auto;
+  height: env(safe-area-inset-top, 0px);
+  z-index: 10;
+  background: var(--rh-void);
+}
+
+a {
+  color: var(--rh-ember-hi);
+  text-underline-offset: 3px;
+}
+
+a:hover {
+  color: var(--rh-ember-2);
+}
+
+:focus-visible {
+  outline: 2px solid var(--rh-ember-hi);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--rh-font-display);
+  font-weight: 700;
+  line-height: 1.05;
+  margin: 0;
+  text-wrap: balance;
+}
+
+h1 {
+  font-size: var(--step-3);
+  letter-spacing: -0.005em;
+}
+
+h2 {
+  font-size: var(--step-2);
+  max-width: 22ch;
+}
+
+h3 {
+  font-size: var(--step-1);
+  font-weight: 600;
+}
+
+p {
+  margin: 0;
+}
+
+.wrap {
+  max-width: var(--max);
+  margin-inline: auto;
+  padding-left: var(--gutter);
+  padding-right: var(--gutter-r);
+}
+
+.eyebrow {
+  font-family: var(--rh-font-display);
+  font-weight: 600;
+  font-size: var(--step--1);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--rh-text-3);
+  margin-bottom: 16px;
+}
+
+.muted {
+  color: var(--rh-text-2);
+  max-width: 60ch;
+}
+
+.small {
+  font-size: var(--step--1);
+  color: var(--rh-text-3);
+}
+
+/* Buttons: ember is the one main action in a view. */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0 22px;
+  border-radius: var(--rh-radius-sm);
+  font-weight: 600;
+  font-size: 1rem;
+  text-decoration: none;
+  transition:
+    background var(--rh-dur-fast) var(--rh-ease-out),
+    transform var(--rh-dur-fast) var(--rh-ease-out),
+    border-color var(--rh-dur-fast) var(--rh-ease-out);
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+}
+
+.btn-ember {
+  background: var(--rh-ember);
+  color: var(--rh-on-ember);
+}
+
+.btn-ember:hover {
+  background: var(--rh-ember-hi);
+  color: var(--rh-on-ember);
+}
+
+.btn-quiet {
+  background: var(--rh-panel);
+  border: 1px solid var(--rh-border);
+  color: var(--rh-text);
+}
+
+.btn-quiet:hover {
+  color: var(--rh-text);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.btn-sm {
+  min-height: 38px;
+  padding: 0 16px;
+  font-size: var(--step--1);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.actions.center {
+  justify-content: center;
+}
+
+/* Sticky bar */
+.bar {
+  position: sticky;
+  top: env(safe-area-inset-top, 0px);
+  z-index: 5;
+  background: rgba(13, 14, 19, 0.78);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--rh-border);
+}
+
+.bar-inner {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  min-height: 60px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--rh-font-display);
+  font-weight: 700;
+  font-size: 1.25rem;
+  letter-spacing: 0.02em;
+  color: var(--rh-text);
+  text-decoration: none;
+}
+
+.brand:hover {
+  color: var(--rh-text);
+}
+
+.nav {
+  display: flex;
+  gap: 24px;
+  margin-left: auto;
+}
+
+.nav a {
+  color: var(--rh-text-2);
+  text-decoration: none;
+  font-size: var(--step--1);
+  font-weight: 500;
+}
+
+.nav a:hover {
+  color: var(--rh-text);
+}
+
+@media (max-width: 720px) {
+  .nav {
+    display: none;
+  }
+
+  .bar .btn {
+    margin-left: auto;
+  }
+}
+
+/* Hero */
+.hero {
+  background: var(--rh-bg);
+  padding-block: clamp(56px, 9vw, 112px) clamp(64px, 9vw, 120px);
+  overflow: hidden;
+}
+
+.hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  gap: 48px;
+  align-items: center;
+}
+
+.hero-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+}
+
+.hero-copy .eyebrow {
+  margin: 0;
+  color: var(--rh-ember-2);
+}
+
+.lede {
+  font-size: var(--step-1);
+  line-height: 1.55;
+  color: var(--rh-text-2);
+  max-width: 34ch;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.chips li {
+  font-size: var(--step--1);
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--rh-panel);
+  border: 1px solid var(--rh-border);
+  color: var(--rh-text-2);
+}
+
+/* The scope: radar rings with the overlay readout at the centre. */
+.scope {
+  position: relative;
+  aspect-ratio: 1;
+  max-width: 100%;
+  width: min(100%, 500px);
+  justify-self: center;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 16px;
+}
+
+.scope-rings {
+  position: absolute;
+  inset: 0;
+}
+
+.ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.r1 {
+  inset: 0;
+}
+
+.r2 {
+  inset: 14%;
+}
+
+.r3 {
+  inset: 28%;
+  border: 1px dashed rgba(255, 138, 31, 0.22);
+}
+
+.sweep {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    rgba(61, 214, 181, 0) 0deg,
+    rgba(61, 214, 181, 0) 300deg,
+    rgba(61, 214, 181, 0.14) 360deg
+  );
+  mask: radial-gradient(circle, #000 0 70%, transparent 71%);
+  animation: sweep 6s linear infinite;
+}
+
+.tick {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.t1,
+.t2 {
+  left: 50%;
+  width: 1px;
+  height: 12%;
+}
+
+.t1 {
+  top: 0;
+}
+
+.t2 {
+  bottom: 0;
+}
+
+.t3,
+.t4 {
+  top: 50%;
+  height: 1px;
+  width: 12%;
+}
+
+.t3 {
+  left: 0;
+}
+
+.t4 {
+  right: 0;
+}
+
+.overlay {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 18px 24px;
+  border-radius: 14px;
+  background: linear-gradient(90deg, rgba(14, 16, 22, 0.94), rgba(14, 16, 22, 0.8));
+  border: 1px solid rgba(255, 138, 31, 0.28);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
+  max-width: 100%;
+}
+
+/* The one ember glow on the page, as in the app. */
+.readout {
+  font-family: var(--rh-font-mono);
+  font-weight: 700;
+  font-size: clamp(2.5rem, 1.6rem + 3vw, 3.75rem);
+  line-height: 1;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--rh-ember);
+  text-shadow: 0 0 28px rgba(255, 138, 31, 0.45);
+  min-width: 6ch;
+}
+
+.overlay-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+
+.overlay-name {
+  font-size: 1.375rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.overlay.swap .readout,
+.overlay.swap .overlay-side {
+  animation: arrive var(--rh-dur-fast) var(--rh-ease-out);
+}
+
+.scope-status {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--rh-font-mono);
+  font-size: 0.8125rem;
+  color: var(--rh-text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--rh-scan);
+  flex: none;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+/* Rarity badges, same mapping as the app. */
+.tier {
+  display: inline-block;
+  font-family: var(--rh-font-body);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  border-radius: 999px;
+  color: var(--rh-void);
+  background: var(--rh-tier-common);
+  white-space: nowrap;
+}
+
+.tier[data-tier="uncommon"] {
+  background: var(--rh-tier-uncommon);
+}
+
+.tier[data-tier="rare"] {
+  background: var(--rh-tier-rare);
+  color: var(--rh-text);
+}
+
+.tier[data-tier="epic"] {
+  background: var(--rh-tier-epic);
+  color: var(--rh-text);
+}
+
+.tier[data-tier="legendary"] {
+  background: var(--rh-tier-legendary);
+}
+
+.tier[data-tier="ground"],
+.tier[data-tier="salvage"] {
+  background: var(--rh-plate);
+  color: var(--rh-text-2);
+}
+
+/* Section rhythm */
+.section,
+.band {
+  padding-block: clamp(64px, 9vw, 112px);
+}
+
+.band {
+  background: var(--rh-deep);
+  border-block: 1px solid var(--rh-border);
+}
+
+/* Steps: a real sequence, so they are numbered. */
+.steps {
+  list-style: none;
+  margin: 48px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.step {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 28px;
+  border-radius: var(--rh-radius-md);
+  background: var(--rh-panel);
+  border: 1px solid var(--rh-border);
+  min-width: 0;
+}
+
+.step p {
+  color: var(--rh-text-2);
+}
+
+.step-n {
+  font-family: var(--rh-font-mono);
+  font-weight: 700;
+  font-size: 0.875rem;
+  color: var(--rh-ember-hi);
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 138, 31, 0.35);
+}
+
+.step .spec {
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid var(--rh-border);
+  font-family: var(--rh-font-mono);
+  font-size: 0.8125rem;
+  color: var(--rh-text-3);
+}
+
+/* The app */
+.windows-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 420px);
+  gap: 64px;
+  align-items: center;
+}
+
+.windows-copy {
+  min-width: 0;
+}
+
+.facts {
+  list-style: none;
+  margin: 32px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 56ch;
+}
+
+.facts li {
+  color: var(--rh-text-2);
+  padding-left: 20px;
+  border-left: 1px solid var(--rh-border);
+}
+
+.facts strong {
+  display: block;
+  color: var(--rh-text);
+  font-weight: 600;
+}
+
+/* An HTML copy of the main window, so it stays sharp at any size. */
+.app {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+  border-radius: var(--rh-radius-lg);
+  background: linear-gradient(180deg, #171a23, var(--rh-deep));
+  border: 1px solid var(--rh-border);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+  font-size: 0.9375rem;
+  min-width: 0;
+}
+
+.app-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.app-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 1.0625rem;
+}
+
+.app-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--rh-plate);
+  color: var(--rh-text-2);
+}
+
+.app-live .dot {
+  width: 6px;
+  height: 6px;
+}
+
+.app-stop {
+  margin-left: auto;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: var(--rh-radius-sm);
+  background: #8f1d20;
+  color: var(--rh-text);
+}
+
+.app-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 18px 20px;
+  border-radius: var(--rh-radius-md);
+  background: var(--rh-panel);
+  border: 1px solid var(--rh-border);
+}
+
+.app-label {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--rh-text-3);
+}
+
+.app-value {
+  font-family: var(--rh-font-mono);
+  font-weight: 700;
+  font-size: 2.75rem;
+  line-height: 1.1;
+  color: var(--rh-ember);
+  font-variant-numeric: tabular-nums;
+}
+
+.app-match {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+  font-size: 1.125rem;
+}
+
+.app-kind {
+  color: var(--rh-text-3);
+  font-size: 0.875rem;
+}
+
+.app-seg {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 4px;
+  gap: 4px;
+  border-radius: var(--rh-radius-sm);
+  background: var(--rh-panel);
+  border: 1px solid var(--rh-border);
+  font-size: 0.8125rem;
+  text-align: center;
+  color: var(--rh-text-3);
+}
+
+.app-seg span {
+  padding: 6px 4px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.app-seg .on {
+  background: var(--rh-plate);
+  color: var(--rh-text);
+}
+
+.app-row {
+  display: grid;
+  grid-template-columns: 4.5rem minmax(0, 1fr) auto;
+  gap: 12px;
+  color: var(--rh-text-2);
+  font-size: 0.875rem;
+}
+
+.app-row span:first-child {
+  font-family: var(--rh-font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--rh-text);
+}
+
+.app-row span:last-child {
+  color: var(--rh-text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.app-foot {
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--rh-text-3);
+}
+
+/* Lookup */
+.lookup-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 64px;
+  align-items: start;
+}
+
+.lookup-grid h2 {
+  margin-bottom: 16px;
+}
+
+.lookup-form {
+  margin-top: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 320px;
+}
+
+.lookup-form label {
+  font-size: var(--step--1);
+  font-weight: 600;
+  color: var(--rh-text-3);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.lookup-form input {
+  font-family: var(--rh-font-mono);
+  font-weight: 700;
+  font-size: 2rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--rh-text);
+  background: var(--rh-void);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--rh-radius-md);
+  padding: 12px 16px;
+  width: 100%;
+}
+
+.lookup-form input:focus {
+  outline: none;
+  border-color: var(--rh-ember);
+}
+
+.lookup-out {
+  min-width: 0;
+}
+
+.matches {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.match {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px 16px;
+  padding: 14px 18px;
+  border-radius: var(--rh-radius-md);
+  background: var(--rh-panel);
+  border: 1px solid var(--rh-border);
+  animation: arrive var(--rh-dur-fast) var(--rh-ease-out) backwards;
+}
+
+.match:first-child {
+  border-color: rgba(255, 138, 31, 0.3);
+}
+
+.match-name {
+  font-weight: 600;
+  font-size: 1.125rem;
+}
+
+.match-math {
+  grid-column: 1 / -1;
+  font-family: var(--rh-font-mono);
+  font-size: 0.8125rem;
+  color: var(--rh-text-3);
+}
+
+.match-empty {
+  color: var(--rh-text-2);
+  padding: 14px 18px;
+  border-radius: var(--rh-radius-md);
+  border: 1px dashed var(--rh-border);
+}
+
+/* Download */
+.get-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 20px;
+}
+
+.get-inner h2 {
+  max-width: none;
+}
+
+.get-inner .muted {
+  margin-bottom: 8px;
+}
+
+/* Footer */
+.foot {
+  border-top: 1px solid var(--rh-border);
+  padding-block: 40px 56px;
+  font-size: var(--step--1);
+  color: var(--rh-text-3);
+}
+
+.foot-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.foot a {
+  color: var(--rh-text-2);
+}
+
+.foot a:hover {
+  color: var(--rh-text);
+}
+
+.disclaimer {
+  margin-top: 8px;
+}
+
+/* Motion: the app's "arrive" (short rise and fade). */
+@keyframes arrive {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@keyframes sweep {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.arrive {
+  animation: arrive var(--rh-dur-slow) var(--rh-ease-out) backwards;
+  animation-delay: calc(var(--i, 0) * 90ms);
+}
+
+/* Plays when the element scrolls in; it is visible before that. */
+.reveal.in {
+  animation: arrive var(--rh-dur-slow) var(--rh-ease-out) backwards;
+  animation-delay: calc(var(--i, 0) * 90ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* Narrow screens */
+@media (max-width: 900px) {
+  .hero-grid,
+  .windows-grid,
+  .lookup-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .scope {
+    width: min(100%, 440px);
+  }
+
+  .steps {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .windows-grid .app {
+    max-width: 440px;
+  }
+}
+
+@media (max-width: 440px) {
+  .overlay {
+    gap: 14px;
+    padding: 14px 16px;
+  }
+
+  .overlay-name {
+    font-size: 1.125rem;
+  }
+}

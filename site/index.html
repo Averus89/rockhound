@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Rockhound</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="A fast signature scanner for Star Citizen. Rockhound reads the signature value off your HUD and names the ore, the rock count or the salvage while you keep flying.">
+<meta name="theme-color" content="#0d0e13">
+<meta property="og:title" content="Rockhound">
+<meta property="og:description" content="Know the rock before you land. A fast signature scanner for Star Citizen.">
+<meta property="og:type" content="website">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap">
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="mark" viewBox="0 0 24 24">
+    <path d="M18.364 4.636a9 9 0 0 1 .203 12.519l-.203 .21l-4.243 4.242a3 3 0 0 1 -4.097 .135l-.144 -.135l-4.244 -4.243a9 9 0 0 1 12.728 -12.728z" fill="#ff8a1f"></path>
+    <path d="M8.6 10.6 L10.6 7.9 L13.9 7.7 L15.6 10.2 L14.4 13.1 L10.9 13.7 Z" fill="#0d0e13"></path>
+    <path d="M10.6 7.9 L11.9 10.4 L15.6 10.2 M11.9 10.4 L10.9 13.7" stroke="#ff8a1f" stroke-width="0.7" fill="none" stroke-linejoin="round"></path>
+  </symbol>
+</svg>
+
+<header class="bar">
+  <div class="wrap bar-inner">
+    <a class="brand" href="#top" aria-label="Rockhound, back to top">
+      <svg width="28" height="28" aria-hidden="true"><use href="#mark"></use></svg>
+      <span>Rockhound</span>
+    </a>
+    <nav class="nav" aria-label="Sections">
+      <a href="#how">How it reads</a>
+      <a href="#windows">The app</a>
+      <a href="#lookup">Try a number</a>
+    </nav>
+    <a class="btn btn-quiet btn-sm" href="#get">Download</a>
+  </div>
+</header>
+
+<main id="top">
+  <section class="hero">
+    <div class="wrap hero-grid">
+      <div class="hero-copy">
+        <p class="eyebrow arrive" style="--i:0">Signature scanner for Star Citizen</p>
+        <h1 class="arrive" style="--i:1">Know the rock<br>before you land.</h1>
+        <p class="lede arrive" style="--i:2">Rockhound reads the signature value off your HUD and tells you what's out there: which ore, how many rocks, or what kind of salvage. You keep flying.</p>
+        <div class="actions arrive" style="--i:3">
+          <a class="btn btn-ember" href="https://github.com/Averus89/rockhound/releases/latest">Download for Windows</a>
+          <a class="btn btn-quiet" href="https://github.com/Averus89/rockhound">Source on GitHub</a>
+        </div>
+        <ul class="chips arrive" style="--i:4" aria-label="What it recognises">
+          <li>Ship mining</li>
+          <li>Ground deposits</li>
+          <li>Salvage</li>
+        </ul>
+      </div>
+
+      <div class="scope arrive" style="--i:2" aria-label="Example in-game overlay">
+        <div class="scope-rings" aria-hidden="true">
+          <span class="ring r1"></span><span class="ring r2"></span><span class="ring r3"></span>
+          <span class="sweep"></span>
+          <span class="tick t1"></span><span class="tick t2"></span><span class="tick t3"></span><span class="tick t4"></span>
+        </div>
+        <div class="overlay" id="demo">
+          <span class="readout" id="demo-value">17,200</span>
+          <span class="overlay-side">
+            <span class="overlay-name" id="demo-name">Ice ×4</span>
+            <span class="tier" id="demo-tier" data-tier="common">Common</span>
+          </span>
+        </div>
+        <p class="scope-status"><span class="dot" aria-hidden="true"></span><span id="demo-kind">Ship mining</span> · read in <span id="demo-ms">3</span> ms</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="how">
+    <div class="wrap">
+      <p class="eyebrow">How it reads</p>
+      <h2>From a number on your HUD to a name, in a few milliseconds.</h2>
+      <ol class="steps">
+        <li class="step reveal" style="--i:0">
+          <span class="step-n">1</span>
+          <h3>Ping</h3>
+          <p>Fly as usual and ping. When the scanner shows a signature next to the orange map pin, Rockhound finds the pin and crops the number around it.</p>
+          <p class="spec">Captures the game window, nothing else</p>
+        </li>
+        <li class="step reveal" style="--i:1">
+          <span class="step-n">2</span>
+          <h3>Read</h3>
+          <p>The HUD always uses the same digit font, so Rockhound matches each digit against stored templates instead of running a general OCR engine. Several frames vote on the result.</p>
+          <p class="spec">About 3 ms per read</p>
+        </li>
+        <li class="step reveal" style="--i:2">
+          <span class="step-n">3</span>
+          <h3>Name it</h3>
+          <p>A signature is a base value times the number of rocks. Rockhound looks it up in the signature table and shows the best match, with anything else it could be underneath.</p>
+          <p class="spec">Table from the game files, SC 4.10.2</p>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="section" id="windows">
+    <div class="wrap windows-grid">
+      <div class="windows-copy">
+        <p class="eyebrow">The app</p>
+        <h2>A main window, and an overlay that stays out of the way.</h2>
+        <ul class="facts">
+          <li class="reveal" style="--i:0"><strong>Overlay on top of the game.</strong> Click-through, always on top, showing just the value and what it is.</li>
+          <li class="reveal" style="--i:1"><strong>Where you are.</strong> Some numbers mean different things in space and on a planet. Tell Rockhound where you are and it puts the right answer first.</li>
+          <li class="reveal" style="--i:2"><strong>Up to date after a patch.</strong> The app checks for a newer signature table at startup and falls back to the one it ships with.</li>
+          <li class="reveal" style="--i:3"><strong>Small and quick.</strong> Written in Rust with a Tauri window, so it starts fast and stays light while the game runs.</li>
+        </ul>
+      </div>
+
+      <div class="app reveal" style="--i:1" role="img" aria-label="Rockhound main window showing a signature of 17,200, Ice times 4, common, ship mining">
+        <div class="app-top">
+          <span class="app-brand"><svg width="18" height="18" aria-hidden="true"><use href="#mark"></use></svg>Rockhound</span>
+          <span class="app-live"><span class="dot" aria-hidden="true"></span>Scanning</span>
+          <span class="app-stop">Stop</span>
+        </div>
+        <div class="app-card">
+          <span class="app-label">Signature</span>
+          <span class="app-value">17,200</span>
+          <span class="app-match">Ice ×4 <span class="tier" data-tier="common">Common</span></span>
+          <span class="app-kind">Ship mining</span>
+        </div>
+        <div class="app-seg" aria-hidden="true">
+          <span>Anywhere</span><span class="on">In space</span><span>On a planet</span>
+        </div>
+        <div class="app-card app-recent">
+          <span class="app-label">Recent</span>
+          <span class="app-row"><span>17,200</span><span>Ice ×4</span><span>19:13</span></span>
+          <span class="app-row"><span>9,510</span><span>Quantainium ×3</span><span>19:11</span></span>
+          <span class="app-row"><span>7,650</span><span>Laranite ×2</span><span>19:08</span></span>
+        </div>
+        <span class="app-foot">Signature data 2026.10.19 · Star Citizen 4.10.2</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="lookup">
+    <div class="wrap lookup-grid">
+      <div>
+        <p class="eyebrow">Try a number</p>
+        <h2>What does your signature mean?</h2>
+        <p class="muted">Type a value from your scanner. This uses the same table as the app.</p>
+        <form class="lookup-form" id="lookup-form" autocomplete="off">
+          <label for="lookup-input">Signature</label>
+          <input id="lookup-input" name="signature" inputmode="numeric" value="13,600" spellcheck="false">
+        </form>
+      </div>
+      <div class="lookup-out" aria-live="polite">
+        <ul class="matches" id="lookup-matches"></ul>
+        <p class="muted small" id="lookup-note"></p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section get" id="get">
+    <div class="wrap get-inner">
+      <svg class="get-mark" width="56" height="56" aria-hidden="true"><use href="#mark"></use></svg>
+      <h2>Free for Windows.</h2>
+      <p class="muted">Every release is published on GitHub with an installer and a portable exe. If Rockhound saves you a few empty trips, you can buy the developer a coffee.</p>
+      <div class="actions center">
+        <a class="btn btn-ember" href="https://github.com/Averus89/rockhound/releases/latest">Download the latest release</a>
+        <a class="btn btn-quiet" href="https://buymeacoffee.com/averus">Buy me a coffee</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <div class="wrap foot-inner">
+    <p>Rockhound is maintained by <a href="https://github.com/Averus89">Averus89</a>. It grew out of <a href="https://github.com/Averus89/SC_Signature_Scanner">SC Signature Scanner</a> by Mallachi, whose signature data it still builds on.</p>
+    <p>Source available under the <a href="https://github.com/Averus89/rockhound/blob/main/LICENSE">PolyForm Noncommercial License 1.0.0</a>.</p>
+    <p class="disclaimer">Fan-made. Not affiliated with Cloud Imperium Games. Star Citizen is a trademark of Cloud Imperium Rights LLC.</p>
+  </div>
+</footer>
+
+<script src="main.js"></script>
+</body>
+</html>
