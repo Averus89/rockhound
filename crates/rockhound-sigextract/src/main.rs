@@ -108,6 +108,13 @@ fn update(
         "{} entities, {} with signatures",
         scan.entities, scan.with_signature
     );
+    if scan.searched > 0 {
+        eprintln!(
+            "note: {} signatures were not at the usual path and were found by searching; \
+             check the values, and update the path in src/entities.rs",
+            scan.searched
+        );
+    }
     if found.is_empty() {
         bail!("no entity signatures found; the game data layout may have changed (try `dump`)");
     }

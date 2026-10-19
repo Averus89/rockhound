@@ -89,6 +89,41 @@ fn size_of(data_type: u16) -> Option<usize> {
     })
 }
 
+/// Record size up to DataCore version 6: name, file name, struct index,
+/// 16-byte id, instance index and struct size.
+const MIN_RECORD_SIZE: usize = 32;
+
+/// Decode the record table, given each record's size. Bytes beyond the
+/// known 32 are fields we don't need: version 8 puts 4 after the file name,
+/// so try every split of them between that spot and the end of the record.
+/// A split fits when every record names a real struct and repeats that
+/// struct's size, which misread fields practically never do.
+fn read_records(bytes: &[u8], size: usize, structs: &[StructDef]) -> Option<Vec<RecordDef>> {
+    let extra = size - MIN_RECORD_SIZE;
+    let u16_at = |b: &[u8], i: usize| u16::from_le_bytes([b[i], b[i + 1]]);
+    let u32_at = |b: &[u8], i: usize| u32::from_le_bytes(b[i..i + 4].try_into().unwrap());
+    if !extra.is_multiple_of(4) {
+        return None;
+    }
+    (0..=extra).step_by(4).find_map(|middle| {
+        // Offset of a field that sits at `known` in the 32-byte layout.
+        let field = |known: usize| if known >= 8 { known + middle } else { known };
+        bytes
+            .chunks_exact(size)
+            .map(|r| {
+                let struct_index = u32_at(r, field(8));
+                let def = structs.get(struct_index as usize)?;
+                (u32::from(u16_at(r, field(30))) == def.size & 0xffff).then(|| RecordDef {
+                    name: u32_at(r, 0),
+                    file_name: u32_at(r, 4),
+                    struct_index,
+                    instance: u16_at(r, field(28)),
+                })
+            })
+            .collect()
+    })
+}
+
 #[derive(Debug, Clone, Copy)]
 struct StructDef {
     name: u32,
@@ -234,62 +269,76 @@ impl DataCore {
         let mappings = (0..mapping_count)
             .map(|_| Ok((c.u32()?, c.u32()?)))
             .collect::<Result<Vec<_>>>()?;
-        let records = (0..record_count)
-            .map(|_| {
-                let name = c.u32()?;
-                let file_name = c.u32()?;
-                // Version 8 (SC 4.x) adds a string offset after the file name.
-                if version >= 8 {
-                    c.take(4)?;
-                }
-                let struct_index = c.u32()?;
-                c.take(16)?;
-                let instance = c.u16()?;
-                c.take(2)?;
-                Ok(RecordDef {
-                    name,
-                    file_name,
-                    struct_index,
-                    instance,
-                })
-            })
-            .collect::<Result<Vec<_>>>()?;
-
-        let mut pools = [0; 19];
-        let mut pool_counts = [0; 19];
-        for (i, &t) in POOLS.iter().enumerate() {
-            pools[i] = c.pos;
-            pool_counts[i] = header[POOL_COUNT_SLOT[i]];
-            c.take(pool_counts[i] * size_of(t).unwrap())?;
-        }
-        let text1 = (c.pos, c.pos + header[28]);
-        c.take(header[28])?;
-        let text2 = (c.pos, c.pos + header[29]);
-        c.take(header[29])?;
-
-        let mut blocks = vec![None; structs.len()];
-        let mut pos = c.pos;
-        for (count, struct_index) in mappings {
+        let records_start = c.pos;
+        // Everything after the records has a size the header fixes, so the
+        // record size is whatever is left. CIG has grown records before
+        // (32 bytes up to version 6, 36 in version 8); working it out here
+        // keeps the tool running when they do it again.
+        let pool_counts: [usize; 19] = std::array::from_fn(|i| header[POOL_COUNT_SLOT[i]]);
+        let pool_bytes: usize = POOLS
+            .iter()
+            .zip(pool_counts)
+            .map(|(&t, n)| n * size_of(t).unwrap())
+            .sum();
+        let mut data_bytes = 0;
+        for &(count, struct_index) in &mappings {
             let def = structs
                 .get(struct_index as usize)
                 .ok_or(DataCoreError::BadIndex("struct in a data mapping"))?;
-            let slot = &mut blocks[struct_index as usize];
-            if slot.is_none() {
-                *slot = Some((pos, count));
-            }
-            pos += count as usize * def.size as usize;
+            data_bytes += count as usize * def.size as usize;
         }
-        if pos != bytes.len() {
+        let tail = pool_bytes + header[28] + header[29] + data_bytes;
+        let layout_error = || {
             // Name the counts, so a report of this error says which table
             // changed size (the gap is usually a multiple of one count).
-            return Err(DataCoreError::Layout(format!(
-                "data section ends at byte {pos} but the file has {} bytes \
+            DataCoreError::Layout(format!(
+                "tables don't add up to the file size of {} bytes \
                  (version {version}, structs {struct_count}, properties {prop_count}, \
                  enums {enum_count}, mappings {mapping_count}, records {record_count}, \
                  header {:?})",
                 bytes.len(),
                 &header[9..]
-            )));
+            ))
+        };
+        let record_bytes = bytes
+            .len()
+            .checked_sub(records_start + tail)
+            .ok_or_else(layout_error)?;
+        let record_size = match record_count {
+            0 => MIN_RECORD_SIZE,
+            n if record_bytes.is_multiple_of(n) => record_bytes / n,
+            _ => return Err(layout_error()),
+        };
+        if record_size < MIN_RECORD_SIZE || (record_count == 0 && record_bytes != 0) {
+            return Err(layout_error());
+        }
+        let records = read_records(
+            &bytes[records_start..records_start + record_bytes],
+            record_size,
+            &structs,
+        )
+        .ok_or_else(|| {
+            DataCoreError::Layout(format!(
+                "records are {record_size} bytes and no known field order fits them"
+            ))
+        })?;
+
+        let mut pos = records_start + record_bytes;
+        let mut pools = [0; 19];
+        for (i, &t) in POOLS.iter().enumerate() {
+            pools[i] = pos;
+            pos += pool_counts[i] * size_of(t).unwrap();
+        }
+        let text1 = (pos, pos + header[28]);
+        let text2 = (text1.1, text1.1 + header[29]);
+        let mut blocks = vec![None; structs.len()];
+        pos = text2.1;
+        for (count, struct_index) in mappings {
+            let slot = &mut blocks[struct_index as usize];
+            if slot.is_none() {
+                *slot = Some((pos, count));
+            }
+            pos += count as usize * structs[struct_index as usize].size as usize;
         }
 
         let db = Self {
@@ -441,6 +490,11 @@ impl DataCore {
                 let value = if p.is_array {
                     let count = c.u32()?;
                     let first = c.u32()?;
+                    // Check the whole range up front: a garbage count would
+                    // otherwise allocate billions of values before failing.
+                    if u64::from(first) + u64::from(count) > self.array_capacity(&p)? as u64 {
+                        return Err(DataCoreError::BadIndex("array range"));
+                    }
                     Value::Array(
                         (first..first.saturating_add(count))
                             .map(|i| self.pool_value(&p, i))
@@ -456,6 +510,26 @@ impl DataCore {
             .collect()
     }
 
+    /// How many elements an array property can index into.
+    fn array_capacity(&self, p: &PropDef) -> Result<usize> {
+        if p.data_type == ty::CLASS {
+            return Ok(self
+                .blocks
+                .get(usize::from(p.struct_index))
+                .copied()
+                .flatten()
+                .map_or(0, |(_, n)| n as usize));
+        }
+        Ok(self.pool_counts[self.pool_of(p.data_type)?])
+    }
+
+    fn pool_of(&self, data_type: u16) -> Result<usize> {
+        POOLS
+            .iter()
+            .position(|&t| t == data_type)
+            .ok_or_else(|| DataCoreError::Layout(format!("no pool for type {data_type:#x}")))
+    }
+
     fn pool_value(&self, p: &PropDef, index: u32) -> Result<Value> {
         if p.data_type == ty::CLASS {
             return Ok(Value::Ptr(Ptr {
@@ -463,13 +537,7 @@ impl DataCore {
                 instance: index,
             }));
         }
-        let pool = POOLS
-            .iter()
-            .position(|&t| t == p.data_type)
-            .ok_or_else(|| DataCoreError::Layout(format!("no pool for type {:#x}", p.data_type)))?;
-        if index as usize >= self.pool_counts[pool] {
-            return Err(DataCoreError::BadIndex("array element"));
-        }
+        let pool = self.pool_of(p.data_type)?;
         let mut c = Cursor {
             bytes: &self.bytes,
             pos: self.pools[pool] + index as usize * size_of(p.data_type).unwrap(),
@@ -641,6 +709,8 @@ pub(crate) mod tests {
         pub text1: Vec<u8>,
         pub text2: Vec<u8>,
         pub version: u32,
+        /// Unknown bytes appended to every record, as a future version might.
+        pub record_tail: usize,
     }
 
     impl Builder {
@@ -737,7 +807,8 @@ pub(crate) mod tests {
                 records.extend_from_slice(&struct_index.to_le_bytes());
                 records.extend_from_slice(&[0xab; 16]);
                 records.extend_from_slice(&instance.to_le_bytes());
-                records.extend_from_slice(&[0, 0]);
+                records.extend_from_slice(&(sizes[struct_index as usize] as u16).to_le_bytes());
+                records.extend(std::iter::repeat_n(0xef, self.record_tail));
             }
             let mappings: Vec<(u32, u32)> = self
                 .instances
@@ -949,6 +1020,62 @@ pub(crate) mod tests {
         assert_eq!(rec.name, "All.Thing");
         assert_eq!(rec.file_name, "libs/thing.xml");
         assert_eq!(db.field(rec.ptr, "id").unwrap(), Some(Value::UInt(42)));
+    }
+
+    /// One record of struct `X`, with `tail` unknown bytes per record.
+    fn one_record(version: u32, tail: usize) -> Vec<u8> {
+        let mut b = Builder::new();
+        b.version = version;
+        b.record_tail = tail;
+        let s = b.add_struct(S {
+            name: "X",
+            parent: NONE,
+            props: vec![prop("v", ty::U32)],
+        });
+        let i = b.add_instance(s, le32(7));
+        b.add_record(
+            "X.One",
+            "one.xml",
+            Ptr {
+                struct_index: s,
+                instance: i,
+            },
+        );
+        b.finish()
+    }
+
+    #[test]
+    fn works_out_grown_records() {
+        // A future version that appends 8 unknown bytes, with or without
+        // the version 8 field.
+        for version in [6, 8] {
+            let db = DataCore::parse(one_record(version, 8)).unwrap();
+            let rec = db.records().next().unwrap();
+            assert_eq!(rec.name, "X.One");
+            assert_eq!(rec.file_name, "one.xml");
+            assert_eq!(db.field(rec.ptr, "v").unwrap(), Some(Value::UInt(7)));
+        }
+    }
+
+    #[test]
+    fn rejects_records_no_layout_fits() {
+        let records = HEADER_LEN + 16 + 12 + 8;
+        let fails = |bytes: Vec<u8>, msg: &str| {
+            let err = DataCore::parse(bytes).err().unwrap();
+            assert!(err.to_string().contains(msg), "{err}");
+        };
+        // The struct size the record repeats doesn't match.
+        let mut bytes = one_record(6, 0);
+        bytes[records + 30] ^= 0xff;
+        fails(bytes, "no known field order");
+        // Records grew by a size that isn't whole fields.
+        let mut bytes = one_record(6, 0);
+        bytes.insert(records, 0);
+        fails(bytes, "no known field order");
+        // Too little left for even one record.
+        let mut bytes = one_record(6, 0);
+        bytes.pop();
+        fails(bytes, "don't add up");
     }
 
     #[test]

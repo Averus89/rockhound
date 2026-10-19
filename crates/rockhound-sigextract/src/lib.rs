@@ -127,4 +127,21 @@ mod tests {
         assert!(is_dcb_name("Data/Game2.dcb"));
         assert!(!is_dcb_name("Data/Other/Game2.dcb"));
     }
+
+    /// Run against a real Game2.dcb or Data.p4k:
+    /// `SIGEXTRACT_GAME=path cargo test -p rockhound-sigextract -- --ignored`.
+    /// Every table row must be found in the game data.
+    #[test]
+    #[ignore = "needs the game files"]
+    fn real_game_data_covers_the_table() {
+        let path = std::env::var("SIGEXTRACT_GAME").expect("set SIGEXTRACT_GAME");
+        let db = load(Path::new(&path)).unwrap();
+        let (found, scan) = entities::entity_signatures(&db).unwrap();
+        assert_eq!(scan.searched, 0, "the signature path moved");
+        let table =
+            rockhound_core::SignatureDb::from_json(include_str!("../../../data/signatures.json"))
+                .unwrap();
+        let m = table::merge(&table, &found, None, "2099.01.01");
+        assert!(m.unmatched_rows.is_empty(), "{:?}", m.unmatched_rows);
+    }
 }

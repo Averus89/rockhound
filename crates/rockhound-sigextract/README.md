@@ -64,6 +64,26 @@ small and large ground deposits, `SalvageScrap*`, `SalvageLock*` and
 entities (`AsteroidCTypeMineableRock`, `GraniteMineableRock_*`), tests and
 templates are ignored.
 
+## After a game update changes things
+
+The tool is built to keep working when CIG reshuffles the data:
+
+- **Bigger records.** The record size is worked out from the file rather
+  than assumed, and the field order is checked against every record.
+- **Moved signatures.** If the usual path to the signature array is gone,
+  it searches the signature component for it and prints a note saying so.
+- **New minerals or tiers.** Any `MineableRock_Asteroid<Tier>_<Mineral>`
+  becomes a row, including tiers it hasn't seen before.
+- **Renamed entities.** Rows nothing matches keep their old value and are
+  listed in the report, and unfamiliar `MineableRock_*` or salvage entities
+  are listed with their values, so a rename shows up instead of silently
+  freezing the table.
+
+When CIG changes the format beyond that, the parser stops with an error
+rather than writing wrong values. Developers can check a new patch with
+`SIGEXTRACT_GAME=<Data.p4k or Game2.dcb> cargo test -p rockhound-sigextract -- --ignored`,
+which fails if any table row is no longer found.
+
 ## When something looks wrong
 
 - `sigextract list --filter mineable > entities.tsv` writes every entity with

@@ -81,7 +81,7 @@ pub enum Kind {
     /// A fixed table row.
     Row(&'static str),
     /// A ship-mineable mineral, with its name as the game spells it.
-    Mineral { name: String, tier: &'static str },
+    Mineral { name: String, tier: String },
     /// In a covered family, but no rule knows it.
     Unknown,
 }
@@ -100,15 +100,16 @@ pub fn classify(entity_name: &str) -> Option<Kind> {
         if *family == "groundvehicle" {
             return Some(Kind::Row(LARGE_DEPOSIT));
         }
+        // Any tier word counts, so a tier CIG adds later is picked up too.
         let tier = ["asteroid", "surface"]
             .iter()
             .find_map(|p| family.strip_prefix(p))
-            .and_then(|t| TIERS.iter().find(|x| **x == t));
+            .filter(|t| !t.is_empty() && t.chars().all(|c| c.is_ascii_alphabetic()));
         if let Some(tier) = tier {
             let original = entity_name.split('_').nth(2).unwrap_or(mineral);
             return Some(Kind::Mineral {
                 name: original.to_owned(),
-                tier,
+                tier: tier.to_owned(),
             });
         }
     }
@@ -141,6 +142,7 @@ fn mineral_row(table: &SignatureDb, name: &str) -> Option<usize> {
 
 /// Add a ship-mining row after the last row of the same or a rarer tier
 /// (the table runs from legendary to common), so it stays grouped by tier.
+/// A tier this tool doesn't know goes after all ship-mining rows.
 fn add_mineral(table: &mut SignatureDb, name: &str, tier: &str) -> usize {
     let rank = |t: &str| TIERS.iter().position(|x| *x == t);
     let new_rank = rank(tier);
@@ -187,7 +189,7 @@ pub fn merge(
             Some(Kind::Mineral { name, tier }) => {
                 let i = mineral_row(&out, &name).unwrap_or_else(|| {
                     added.push(name.clone());
-                    add_mineral(&mut out, &name, tier)
+                    add_mineral(&mut out, &name, &tier)
                 });
                 out.sources[i].name.clone()
             }
@@ -286,10 +288,10 @@ mod tests {
         }
     }
 
-    fn mineral(name: &str, tier: &'static str) -> Option<Kind> {
+    fn mineral(name: &str, tier: &str) -> Option<Kind> {
         Some(Kind::Mineral {
             name: name.into(),
-            tier,
+            tier: tier.into(),
         })
     }
 
@@ -325,8 +327,9 @@ mod tests {
         assert_eq!(classify("SalvageableDebris_Redeemer"), Some(Kind::Unknown));
         assert_eq!(
             classify("MineableRock_AsteroidMythic_Unobtainium"),
-            Some(Kind::Unknown)
+            mineral("Unobtainium", "mythic")
         );
+        assert_eq!(classify("MineableRock_Asteroid_Gold"), Some(Kind::Unknown));
         // Leftovers, tests and templates, and things that aren't rocks.
         for ignored in [
             "AsteroidCTypeMineableRock_Copper",
@@ -387,14 +390,16 @@ mod tests {
             entity("MineableRock_AsteroidEpic_Zenithite", 3415.0),
             entity("MineableRock_SurfaceEpic_Zenithite", 3415.0),
             entity("MineableRock_AsteroidCommon_Slag", 4315.0),
+            entity("MineableRock_AsteroidMythic_Unobtainium", 3000.0),
         ];
         let m = merge(&table(), &entities, None, "2099.01.01");
         assert!(m.changed);
-        assert_eq!(m.added, vec!["Zenithite".to_string(), "Slag".to_string()]);
+        assert_eq!(m.added, ["Zenithite", "Slag", "Unobtainium"]);
         let names: Vec<&str> = m.table.sources.iter().map(|s| s.name.as_str()).collect();
         let at = |n: &str| names.iter().position(|x| *x == n).unwrap();
         assert_eq!(at("Zenithite"), at("Lindinium") + 1);
         assert_eq!(at("Slag"), at("Ice") + 1);
+        assert_eq!(at("Unobtainium"), at("Slag") + 1);
         let z = &m.table.sources[at("Zenithite")];
         assert_eq!(
             (z.base, z.tier.as_deref(), z.max_count),

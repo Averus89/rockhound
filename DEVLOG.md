@@ -33,6 +33,12 @@ same method. No app change, so no version bump.
   `MineableRock_GroundVehicle_*`, salvage panels and `SalvageableDebris_<Ship>`);
   legacy rock types, tests and templates are ignored. A mineral the table
   lacks is added with its tier from the entity name.
+- Made to survive patches (Alan asked for future-proof discovery): the
+  record size is derived from the file and the field order verified against
+  each record's struct size; a moved signature array is searched for below
+  the signature component (and reported); unknown tiers become rows; array
+  ranges and the decompressed size are checked up front. An ignored test
+  (`SIGEXTRACT_GAME=... cargo test -- --ignored`) checks a new patch.
 - CI builds `sigextract.exe` into the `rockhound-windows` artifact.
 
 ## 2026-10-18: License change, contributing guide and security policy

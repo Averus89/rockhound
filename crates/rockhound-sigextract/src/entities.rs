@@ -42,6 +42,9 @@ impl EntitySignature {
 pub struct Scan {
     pub entities: usize,
     pub with_signature: usize,
+    /// Signatures found by searching because the usual path didn't lead to
+    /// them, a sign a patch moved them.
+    pub searched: usize,
 }
 
 /// Every entity that has signature parameters, sorted by name.
@@ -53,10 +56,11 @@ pub fn entity_signatures(db: &DataCore) -> Result<(Vec<EntitySignature>, Scan), 
             continue;
         }
         scan.entities += 1;
-        let Some(channels) = signature_channels(db, &db.fields(rec.ptr)?)? else {
+        let Some((channels, searched)) = signature_channels(db, &db.fields(rec.ptr)?)? else {
             continue;
         };
         scan.with_signature += 1;
+        scan.searched += usize::from(searched);
         let name = rec
             .name
             .strip_prefix(&format!("{ENTITY}."))
@@ -72,35 +76,84 @@ pub fn entity_signatures(db: &DataCore) -> Result<(Vec<EntitySignature>, Scan), 
     Ok((out, scan))
 }
 
+/// How deep the fallback search follows structs below the component; the
+/// usual path is two steps.
+const SEARCH_DEPTH: u32 = 4;
+
+/// The entity's signature channels, and whether they had to be searched for.
 fn signature_channels(
     db: &DataCore,
     entity: &[(String, Value)],
-) -> Result<Option<Vec<f32>>, DataCoreError> {
+) -> Result<Option<(Vec<f32>, bool)>, DataCoreError> {
     let Some(Value::Array(components)) = get(entity, "Components") else {
         return Ok(None);
     };
     for component in components {
         let Value::Ptr(ptr) = component else { continue };
-        if !db.is_a(ptr.struct_index, SIGNATURE_PARAMS) {
+        // A renamed component class most likely keeps "SignatureSystem".
+        if !db.is_a(ptr.struct_index, SIGNATURE_PARAMS)
+            && !db.struct_name(ptr.struct_index).contains("SignatureSystem")
+        {
             continue;
         }
-        let mut node = db.fields(*ptr)?;
-        for step in CHAIN {
-            match child(db, &node, step)? {
-                Some(next) => node = next,
-                None => return Ok(None),
-            }
+        let params = db.fields(*ptr)?;
+        if let Some(channels) = by_path(db, &params)? {
+            return Ok(Some((channels, false)));
         }
-        let Some(Value::Array(items)) = get(&node, SIGNATURES) else {
-            return Ok(None);
-        };
-        let channels = items
-            .iter()
-            .map(|v| number(db, v))
-            .collect::<Result<Option<Vec<f32>>, _>>()?;
-        return Ok(channels);
+        if let Some(channels) = search(db, &params, SEARCH_DEPTH)? {
+            return Ok(Some((channels, true)));
+        }
     }
     Ok(None)
+}
+
+/// Follow the known path to the signature array.
+fn by_path(db: &DataCore, params: &[(String, Value)]) -> Result<Option<Vec<f32>>, DataCoreError> {
+    let mut node = params.to_vec();
+    for step in CHAIN {
+        match child(db, &node, step)? {
+            Some(next) => node = next,
+            None => return Ok(None),
+        }
+    }
+    channels(db, get(&node, SIGNATURES))
+}
+
+/// Find the first `signatures` array long enough to hold the cross section,
+/// anywhere below the component.
+fn search(
+    db: &DataCore,
+    fields: &[(String, Value)],
+    depth: u32,
+) -> Result<Option<Vec<f32>>, DataCoreError> {
+    for (name, value) in fields {
+        if name == SIGNATURES {
+            if let Some(c) = channels(db, Some(value))?.filter(|c| c.len() > CROSS_SECTION) {
+                return Ok(Some(c));
+            }
+        }
+    }
+    if depth == 0 {
+        return Ok(None);
+    }
+    for (name, _) in fields {
+        if let Some(inner) = child(db, fields, name)? {
+            if let Some(c) = search(db, &inner, depth - 1)? {
+                return Ok(Some(c));
+            }
+        }
+    }
+    Ok(None)
+}
+
+fn channels(db: &DataCore, value: Option<&Value>) -> Result<Option<Vec<f32>>, DataCoreError> {
+    let Some(Value::Array(items)) = value else {
+        return Ok(None);
+    };
+    items
+        .iter()
+        .map(|v| number(db, v))
+        .collect::<Result<Option<Vec<f32>>, _>>()
 }
 
 fn get<'a>(fields: &'a [(String, Value)], name: &str) -> Option<&'a Value> {
@@ -242,13 +295,78 @@ pub(crate) mod tests {
             scan,
             Scan {
                 entities: 3,
-                with_signature: 2
+                with_signature: 2,
+                searched: 0,
             }
         );
         assert_eq!(found[0].name, "Alpha");
         assert_eq!(found[0].file, "a.xml");
         assert_eq!(found[0].cross_section(), Some(3170));
         assert_eq!(found[1].cross_section(), Some(4000));
+    }
+
+    /// A patch renames the component and its fields and nests the array
+    /// one level deeper, inline.
+    #[test]
+    fn finds_moved_signatures_by_searching() {
+        let mut b = Builder::new();
+        let entity = b.add_struct(S {
+            name: ENTITY,
+            parent: NONE,
+            props: vec![array("Components", ty::STRONG, 0)],
+        });
+        let holder = b.add_struct(S {
+            name: "SignatureHolder",
+            parent: NONE,
+            props: vec![
+                array("signatures", ty::SINGLE, 0),
+                array("modifiers", ty::SINGLE, 0),
+            ],
+        });
+        let detail = b.add_struct(S {
+            name: "RadarDetail",
+            parent: NONE,
+            props: vec![
+                prop("range", ty::SINGLE),
+                P {
+                    target: holder as u16,
+                    ..prop("sig", ty::CLASS)
+                },
+            ],
+        });
+        let params = b.add_struct(S {
+            name: "SSCSignatureSystemParamsV2",
+            parent: NONE,
+            props: vec![prop("radar", ty::STRONG)],
+        });
+        // A float and a second, shorter array on the way.
+        b.singles = vec![9.0, 0.0, 0.0, 0.0, 0.0, 2400.0];
+        let detail_i = b.add_instance(
+            detail,
+            [
+                1.0f32.to_le_bytes().to_vec(),
+                le32(6),
+                le32(0),
+                le32(1),
+                le32(0),
+            ]
+            .concat(),
+        );
+        let params_i = b.add_instance(params, ptr_bytes(detail, detail_i));
+        b.strongs.push((params, params_i));
+        let e = b.add_instance(entity, [le32(1), le32(0)].concat());
+        b.add_record(
+            "EntityClassDefinition.SalvageableDebris_C2",
+            "c2.xml",
+            Ptr {
+                struct_index: entity,
+                instance: e,
+            },
+        );
+        let db = DataCore::parse(b.finish()).unwrap();
+        let (found, scan) = entity_signatures(&db).unwrap();
+        assert_eq!(scan.searched, 1);
+        assert_eq!(found[0].channels, vec![9.0, 0.0, 0.0, 0.0, 0.0, 2400.0]);
     }
 
     #[test]

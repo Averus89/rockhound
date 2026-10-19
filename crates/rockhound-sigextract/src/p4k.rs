@@ -34,6 +34,8 @@ const LOCAL_SIGS: [u32; 2] = [0x0403_4b50, 0x1403_4b50];
 const ZSTD_MAGIC: [u8; 4] = [0x28, 0xb5, 0x2f, 0xfd];
 const METHOD_STORED: u16 = 0;
 const METHOD_ZSTD: u16 = 100;
+/// Game2.dcb is about 330 MB; never reserve more than this up front.
+const MAX_PREALLOC: usize = 1 << 30;
 
 /// One file in the archive.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -171,8 +173,15 @@ fn decompress(name: &str, raw: &[u8], size: u64) -> Result<Vec<u8>, P4kError> {
         reason: e.to_string(),
     };
     let mut decoder = ruzstd::decoding::StreamingDecoder::new(raw).map_err(|e| zstd_err(&e))?;
-    let mut out = Vec::with_capacity(usize::try_from(size).unwrap_or(0));
+    // The directory's size is only a hint until the data proves it.
+    let mut out = Vec::with_capacity(usize::try_from(size).unwrap_or(0).min(MAX_PREALLOC));
     decoder.read_to_end(&mut out).map_err(|e| zstd_err(&e))?;
+    if out.len() as u64 != size {
+        return Err(zstd_err(&format!(
+            "decompressed to {} bytes, archive says {size}",
+            out.len()
+        )));
+    }
     Ok(out)
 }
 
@@ -362,6 +371,15 @@ pub(crate) mod tests {
             p4k.read(&entry),
             Err(P4kError::Method { method: 8, .. })
         ));
+    }
+
+    #[test]
+    fn rejects_a_size_mismatch() {
+        let archive = build_p4k(&files());
+        let mut p4k = P4k::open(Cursor::new(&archive)).unwrap();
+        let mut entry = p4k.find(|n| n.ends_with("Game2.dcb")).unwrap().unwrap();
+        entry.size += 1;
+        assert!(matches!(p4k.read(&entry), Err(P4kError::Zstd { .. })));
     }
 
     #[test]
