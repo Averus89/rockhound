@@ -18,6 +18,8 @@
 - [x] Signature table sync (fetch, validate, cache, bundled fallback)
 - [ ] Sync only works once the repo (or the data file) is publicly readable
 - [ ] Ship templates with the app instead of the app data folder
+- [x] `sigextract`: refresh signatures.json from Data.p4k after a patch
+- [x] First real run of `sigextract` (SC 4.7 LIVE): table confirmed
 
 ## Milestone 4: overlay
 - [x] Click-through always-on-top overlay window with the current value

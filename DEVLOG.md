@@ -1,5 +1,46 @@
 # Devlog
 
+## 2026-10-19: Signature extractor for game files
+
+Alan asked for a way to take signature values straight from the game files
+after each patch, as SC Signature Scanner did, so he can run it and push the
+result. Mallachi's extractor scripts were never committed upstream, only
+their notes (`SignatureValue.md`), so this is a new implementation of the
+same method. No app change, so no version bump.
+
+- New crate `crates/rockhound-sigextract`, binary `sigextract`. Reads
+  `Data/Game2.dcb` from `Data.p4k` itself (ZIP64, CIG local headers,
+  Zstandard via the pure-Rust `ruzstd`), parses DataCore and follows
+  `Components -> SSCSignatureSystemParams -> radarProperties ->
+  baseSignatureParams -> signatures[4]` for every entity.
+- `update` merges the values into `data/signatures.json`: each row takes the
+  most common value among the entities whose names match it, keeps names,
+  tiers and `max_count`, and stamps `data_version`/`sc_version` only when
+  something changed. The report lists changed rows, rows nothing matched,
+  disagreeing entities and scannable entities no row claims.
+- `list` prints every entity signature as TSV and `dump` prints a record as
+  JSON, for tuning the name rules and following layout changes. `export`
+  saves the decompressed Game2.dcb for offline debugging.
+- The parser checks that every struct's fields add up to its declared size
+  and that the data section ends at the end of the file, so a format change
+  fails loudly instead of producing wrong values. That check caught the
+  first real run: SC 4.7 ships DataCore version 8, whose records carry an
+  extra 4-byte string offset after the file name (36 bytes, not 32).
+- Checked against Alan's SC 4.7 LIVE Game2.dcb: 29,693 entities, 5,849 with
+  signatures, and all 33 rows of the current table confirmed unchanged.
+  Name rules follow the real entity names (`MineableRock_Asteroid<Tier>_*`,
+  `MineableRock_Surface<Tier>_*`, `MineableRock_FPS_*`,
+  `MineableRock_GroundVehicle_*`, salvage panels and `SalvageableDebris_<Ship>`);
+  legacy rock types, tests and templates are ignored. A mineral the table
+  lacks is added with its tier from the entity name.
+- Made to survive patches (Alan asked for future-proof discovery): the
+  record size is derived from the file and the field order verified against
+  each record's struct size; a moved signature array is searched for below
+  the signature component (and reported); unknown tiers become rows; array
+  ranges and the decompressed size are checked up front. An ignored test
+  (`SIGEXTRACT_GAME=... cargo test -- --ignored`) checks a new patch.
+- CI builds `sigextract.exe` into the `rockhound-windows` artifact.
+
 ## 2026-10-18: License change, contributing guide and security policy
 
 Alan asked for a license that stops others copying and monetizing forks, plus
