@@ -11,5 +11,4 @@ Cloudflare Pages).
   when the table changes.
 
 Animation uses the app's "arrive" motion and turns off under
-`prefers-reduced-motion`. Download links point at the latest GitHub Release,
-so they only work for visitors once the repo is public.
+`prefers-reduced-motion`. Download links point at the latest GitHub Release.

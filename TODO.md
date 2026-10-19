@@ -44,6 +44,6 @@
 
 ## Website
 - [x] One-page static site in `site/`
-- [ ] Choose hosting (GitHub Pages needs the repo public or a paid plan)
+- [ ] Choose hosting (repo is public, so GitHub Pages is free)
 - [ ] Final tagline ("Know the rock before you land." is a placeholder)
 - [ ] Social preview image for link cards
