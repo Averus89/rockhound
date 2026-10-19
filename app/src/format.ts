@@ -1,4 +1,4 @@
-import type { Category, SignatureMatch } from "./api";
+import type { Category, Location, SignatureMatch } from "./api";
 
 export const formatSignature = (value: number) => value.toLocaleString("en-US");
 
@@ -33,3 +33,15 @@ export const TIER_COLOR: Record<string, string> = {
 /** Mantine colour for a match's tier; untiered sources use the accent. */
 export const tierColor = (m: SignatureMatch | undefined) =>
   (m?.tier && TIER_COLOR[m.tier]) || "ember";
+
+/** Where each category is found; ship rocks are both asteroids and surface rocks. */
+const FOUND_IN: Record<Category, Location> = {
+  ship_mining: "unknown",
+  ground_deposit: "planet",
+  salvage: "space",
+};
+
+/** True when the matches only split apart once the player's location is known. */
+export const needsLocation = (matches: SignatureMatch[], location: Location) =>
+  location === "unknown" &&
+  new Set(matches.map((m) => FOUND_IN[m.category]).filter((l) => l !== "unknown")).size > 1;

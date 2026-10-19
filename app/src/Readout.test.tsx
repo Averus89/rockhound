@@ -1,8 +1,8 @@
 import { MantineProvider } from "@mantine/core";
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import type { Reading } from "./api";
+import type { Location, Reading } from "./api";
 import { Readout } from "./Readout";
 
 const reading = (overrides: Partial<Reading> = {}): Reading => ({
@@ -19,10 +19,10 @@ const reading = (overrides: Partial<Reading> = {}): Reading => ({
   ...overrides,
 });
 
-const show = (r: Reading | null, scanning = true) =>
+const show = (r: Reading | null, scanning = true, location: Location = "unknown") =>
   render(
     <MantineProvider>
-      <Readout reading={r} scanning={scanning} />
+      <Readout reading={r} scanning={scanning} location={location} />
     </MantineProvider>,
   );
 
@@ -59,6 +59,24 @@ describe("Readout", () => {
     expect(screen.getByText("Iron A ×2 + Ice ×4")).toBeTruthy();
     expect(screen.queryByText("Iron D ×2 + Ice ×4")).toBeNull();
     expect(screen.getByText("and 2 other mixes")).toBeTruthy();
+  });
+
+  it("asks where the player is only when that would rank the matches", () => {
+    const collision = reading({
+      value: 3000,
+      matches: [
+        { name: "Small Ground Deposit", category: "ground_deposit", tier: null, base: 3000, count: 1 },
+        { name: "Capital Wreck Debris", category: "salvage", tier: null, base: 3000, count: 1 },
+      ],
+    });
+    show(collision);
+    expect(screen.getByText(/Choose where you are/)).toBeTruthy();
+    cleanup();
+    show(collision, true, "space");
+    expect(screen.queryByText(/Choose where you are/)).toBeNull();
+    cleanup();
+    show(reading());
+    expect(screen.queryByText(/Choose where you are/)).toBeNull();
   });
 
   it("prompts while waiting for a value", () => {

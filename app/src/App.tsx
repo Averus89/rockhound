@@ -5,6 +5,7 @@ import {
   Button,
   Container,
   Group,
+  SegmentedControl,
   Stack,
   Text,
   Title,
@@ -21,6 +22,7 @@ import { useEffect, useState } from "react";
 
 import {
   getStatus,
+  type Location,
   onReading,
   onScannerStopped,
   onSignaturesUpdated,
@@ -54,7 +56,11 @@ export function App() {
     const unlisten = [
       onReading((r) => {
         setReading(r);
-        if (r.value !== null) setHistory((h) => [r, ...h].slice(0, HISTORY_SIZE));
+        if (r.value === null) return;
+        // A location change resends the shown reading re-ranked.
+        setHistory((h) =>
+          h[0]?.at === r.at ? [r, ...h.slice(1)] : [r, ...h].slice(0, HISTORY_SIZE),
+        );
       }),
       onScannerStopped((e) => {
         if (e) setError(e);
@@ -76,8 +82,18 @@ export function App() {
   };
 
   const save = async (next: Settings) => {
-    await saveSettings(next);
-    await refresh();
+    try {
+      await saveSettings(next);
+    } finally {
+      // Settings are written even when showing the overlay fails, so refresh
+      // either way; stale settings would be resent by the next save.
+      await refresh();
+    }
+  };
+
+  const setLocation = (location: Location) => {
+    if (!status) return;
+    save({ ...status.settings, location }).catch((e) => setError(String(e)));
   };
 
   return (
@@ -132,7 +148,25 @@ export function App() {
           </Alert>
         )}
 
-        <Readout reading={reading} scanning={status?.scanning ?? false} />
+        <SegmentedControl
+          fullWidth
+          size="xs"
+          aria-label="Where you are"
+          disabled={!status}
+          value={status?.settings.location ?? "unknown"}
+          onChange={(v) => setLocation(v as Location)}
+          data={[
+            { value: "unknown", label: "Anywhere" },
+            { value: "space", label: "In space" },
+            { value: "planet", label: "On a planet" },
+          ]}
+        />
+
+        <Readout
+          reading={reading}
+          scanning={status?.scanning ?? false}
+          location={status?.settings.location ?? "unknown"}
+        />
         <History readings={history} />
 
         {status && (

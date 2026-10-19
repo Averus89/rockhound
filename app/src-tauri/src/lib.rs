@@ -22,13 +22,13 @@ use std::sync::{Arc, Mutex, RwLock};
 use std::time::Duration;
 
 use rockhound_core::recognize::TemplateError;
-use rockhound_core::{SignatureDb, TemplateSet};
+use rockhound_core::{Location, SignatureDb, TemplateSet};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State, WebviewWindowBuilder, WindowEvent};
 
 use crate::fake_game::FakeGame;
 use crate::reader::{Reader, Teacher};
-use crate::scanner::{ReplaySource, ScannerHandle};
+use crate::scanner::{Reading, ReplaySource, ScannerHandle};
 use crate::settings::Settings;
 
 /// Development aid: scan a folder of crops instead of the game.
@@ -50,7 +50,44 @@ struct AppState {
     paths: Paths,
     db: Arc<RwLock<SignatureDb>>,
     settings: Mutex<Settings>,
+    shown: Arc<Mutex<Shown>>,
     scanner: Mutex<Option<ScannerHandle>>,
+}
+
+/// The reading on screen, ranked for where the player is. Kept here rather
+/// than in the scan loop so a location change re-ranks it even after the
+/// scan stopped, and so a reading and a location change can't cross.
+#[derive(Default)]
+struct Shown {
+    reading: Option<Reading>,
+    location: Location,
+}
+
+impl Shown {
+    /// Rank `reading` (or the shown one, when `None`) for the current
+    /// location; the reading to send to the UI, if there is one.
+    fn update(&mut self, reading: Option<Reading>, db: &SignatureDb) -> Option<Reading> {
+        if let Some(r) = reading {
+            self.reading = Some(r);
+        }
+        let shown = self.reading.as_mut()?;
+        if let Some(value) = shown.value {
+            // Mixes are all ship rocks, found everywhere, so only matches move.
+            shown.matches = db.matches_at(value, self.location);
+        }
+        Some(shown.clone())
+    }
+}
+
+/// Send `reading` (or the shown one re-ranked) to the UI.
+fn show(app: &AppHandle, shown: &Mutex<Shown>, db: &RwLock<SignatureDb>, reading: Option<Reading>) {
+    let db = db.read().unwrap_or_else(|e| e.into_inner());
+    // Held through the emit, so a reading ranked for the old location can't
+    // be sent after the re-ranked one.
+    let mut shown = lock(shown);
+    if let Some(r) = shown.update(reading, &db) {
+        let _ = app.emit("reading", r);
+    }
 }
 
 #[derive(Serialize)]
@@ -94,6 +131,11 @@ fn save_settings(
     // The file is written, so memory must match it even if the overlay
     // can't be shown; otherwise a restart would apply different settings.
     let shown = overlay::set_visible(&app, settings.overlay);
+    let moved =
+        std::mem::replace(&mut lock(&state.shown).location, settings.location) != settings.location;
+    if moved {
+        show(&app, &state.shown, &state.db, None);
+    }
     *lock(&state.settings) = settings;
     shown
 }
@@ -114,14 +156,13 @@ fn start_scan(app: AppHandle, state: State<'_, AppState>) -> Result<(), String> 
     let interval = Duration::from_millis(settings.interval_ms.clamp(50, 2000));
     let source = open_source(&settings, interval)?;
     let (reading_app, stop_app) = (app.clone(), app);
+    let (shown, db) = (Arc::clone(&state.shown), Arc::clone(&state.db));
     *slot = Some(scanner::spawn(
         source,
         reader,
         Arc::clone(&state.db),
         interval,
-        move |reading| {
-            let _ = reading_app.emit("reading", reading);
-        },
+        move |reading| show(&reading_app, &shown, &db, Some(reading)),
         move |error| {
             let _ = stop_app.emit("scanner-stopped", error);
         },
@@ -215,10 +256,15 @@ pub fn run() {
             let db = sync::load_local(&paths.signature_cache);
             let settings = Settings::load(&paths.settings);
             let show_overlay = settings.overlay;
+            let shown = Shown {
+                reading: None,
+                location: settings.location,
+            };
             app.manage(AppState {
                 paths,
                 db: Arc::new(RwLock::new(db)),
                 settings: Mutex::new(settings),
+                shown: Arc::new(Mutex::new(shown)),
                 scanner: Mutex::new(None),
             });
             // Windows are created here, after the state exists, because
@@ -250,4 +296,41 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running Rockhound");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn reading(value: u32) -> Reading {
+        Reading {
+            value: Some(value),
+            raw: String::new(),
+            confidence: 1.0,
+            corrected: false,
+            matches: Vec::new(),
+            mixes: Vec::new(),
+            at: 7,
+        }
+    }
+
+    #[test]
+    fn shown_reading_is_ranked_for_the_location_and_reranked_when_it_moves() {
+        let db = SignatureDb::from_json(include_str!("../../../data/signatures.json")).unwrap();
+        let best = |r: Option<Reading>| r.map(|r| (r.matches[0].name.clone(), r.at));
+        let mut shown = Shown {
+            reading: None,
+            location: Location::Planet,
+        };
+        assert!(shown.update(None, &db).is_none(), "nothing shown yet");
+        assert_eq!(
+            best(shown.update(Some(reading(3000)), &db)),
+            Some(("Small Ground Deposit".into(), 7))
+        );
+        shown.location = Location::Space;
+        assert_eq!(
+            best(shown.update(None, &db)),
+            Some(("Capital Wreck Debris".into(), 7))
+        );
+    }
 }
