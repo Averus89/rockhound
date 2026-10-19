@@ -18,7 +18,7 @@
 - [x] Signature table sync (fetch, validate, cache, bundled fallback)
 - [x] Sync works now the repo is public
 - [x] App updates itself from GitHub Releases (Tauri updater, signed installer)
-- [ ] Updater key and pubkey set up (Alan)
+- [x] Updater key and pubkey set up (Alan)
 - [ ] Ship templates with the app instead of the app data folder
 - [x] `sigextract`: refresh signatures.json from Data.p4k after a patch
 - [x] First real run of `sigextract` (SC 4.7 LIVE): table confirmed
