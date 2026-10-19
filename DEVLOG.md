@@ -1,5 +1,38 @@
 # Devlog
 
+## 2026-10-19: v0.9.0, glyph packs from players
+
+Alan asked how to get digit glyphs from other players so Rockhound reads
+more screen sizes. He chose a route with no server: the app exports a zip,
+the player attaches it to a GitHub issue, and a workflow turns that into a
+pull request.
+
+- Measured first: 1440p templates read Alan's crops resized to 4K size
+  39/46 and to 1080p size 35/46 (leave-one-out; 40/46 unresized). Resizing
+  only stands in for a real HUD, so real crops are still worth having. These
+  floors are now a ratchet test next to the existing one.
+- Settings > "Collect digit samples" (off by default) keeps readout crops
+  whose frame agrees with the shown value: one every 2 s, at most 4 per
+  value and 150 in all, in `%APPDATA%\io.github.averus89.rockhound\glyph-samples`.
+  Only the small readout crop is kept, never a screenshot.
+- "Review and send samples" shows each crop with its number. The player
+  fixes misreads (likely on a HUD size we don't know yet) and removes bad
+  ones, then Send zips them to Downloads as `<value>-<n>.png`, opens the
+  "Glyph pack" issue form and clears the sent samples.
+- `glyph-pack.yml` runs on those issues: it downloads the attached zip
+  (5 MB cap, names must be `<value>-<n>.png`), then
+  `rockhound-replay import-pack` keeps crops whose value the signature table
+  can make and that split into their digits, re-encodes them and files them
+  under `data/glyphs/h<median digit height>/`. Core tests must still pass,
+  then it opens a PR and comments on the issue (or says what was wrong).
+- Bundled crops are grouped by digit height (`data/glyphs/1440p` is now
+  `h12`). A simulated 4K pack added to the bundle dropped the 1440p reads
+  from 44 to 40 of 46: its samples filled the per-digit cap first. Now
+  the reader measures the digit height on screen and rebuilds the shipped
+  templates with the nearest height's crops first. Other heights only fill
+  the rest of the cap, such as digits a small pack never showed. With one
+  shipped height nothing changes and no extra work is done per frame.
+- New dependency: `zip` 9 with no default features (stored entries only).
 ## 2026-10-19: SmartScreen note
 
 Alan hit the SmartScreen warning installing v0.8.0. The installer has the

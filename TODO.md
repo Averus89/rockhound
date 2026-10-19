@@ -40,9 +40,16 @@
 - [x] Manual space / planet switch ranks colliding signatures
 - [ ] Detect space vs planet automatically (Game.log or HUD cue)
 
+## Glyph packs
+- [x] Opt-in sample collection, review screen and zip export
+- [x] Issue form + workflow that turns a pack into a PR
+- [x] Shipped templates grouped by digit height
+- [ ] Allow GitHub Actions to create pull requests in repo settings (Alan)
+- [ ] First real pack from another resolution
+
 ## Known issues
-- Lines are scaled to 24 px, so templates carry across HUD scales, but a
-  different font weight (e.g. 4K UI scale) may still need its own samples.
+- Lines are scaled to 48 px, so templates carry across HUD sizes (4K-sized
+  39/46, 1080p-sized 35/46), but real packs should beat resized crops.
 - Windows OCR quality on 11 px digits is unknown; it reads a 4x upscale.
 
 ## Website

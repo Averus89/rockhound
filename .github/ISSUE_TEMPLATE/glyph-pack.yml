@@ -1,0 +1,26 @@
+name: Glyph pack
+description: Send digit samples so Rockhound can read your screen's HUD size.
+title: "Glyph pack: "
+labels: [glyph-pack]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping! In Rockhound open **Settings > Review and send samples**,
+        check the numbers and press **Send**. It saves a `rockhound-glyphs-….zip`
+        to your Downloads folder. Drag that zip into the box below.
+
+        The zip only holds the small readout crops (the signature number), never
+        screenshots. A bot checks the crops and opens a pull request with them.
+  - type: input
+    id: resolution
+    attributes:
+      label: Screen resolution and UI scale
+      placeholder: 3840x2160, UI scale 100%
+  - type: textarea
+    id: pack
+    attributes:
+      label: Glyph pack
+      description: Drag the zip file here.
+    validations:
+      required: true

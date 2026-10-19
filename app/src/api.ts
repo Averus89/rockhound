@@ -31,6 +31,8 @@ export interface Settings {
   intervalMs: number;
   overlay: boolean;
   debug: boolean;
+  /** Keep read crops as glyph samples the player can send in. */
+  glyphSamples: boolean;
   location: Location;
 }
 
@@ -46,6 +48,20 @@ export const saveSettings = (settings: Settings) =>
   invoke<void>("save_settings", { settings });
 export const startScan = () => invoke<void>("start_scan");
 export const stopScan = () => invoke<void>("stop_scan");
+
+/** A readout crop kept as a glyph sample, labelled with what was read. */
+export interface GlyphSample {
+  file: string;
+  value: number;
+  /** PNG bytes. */
+  png: number[];
+}
+
+export const listGlyphSamples = () => invoke<GlyphSample[]>("list_glyph_samples");
+export const deleteGlyphSample = (file: string) => invoke<void>("delete_glyph_sample", { file });
+/** Zips the samples with their checked values; returns the zip's path. */
+export const exportGlyphPack = (samples: { file: string; value: number }[]) =>
+  invoke<string>("export_glyph_pack", { samples });
 
 export const onReading = (cb: (r: Reading) => void): Promise<UnlistenFn> =>
   listen<Reading>("reading", (e) => cb(e.payload));

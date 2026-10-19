@@ -4,8 +4,11 @@
 //! 1. `frames`  cut the readout region out of a video at a fixed rate.
 //! 2. `learn`   build digit templates from labelled frames.
 //! 3. `eval`    score the pipeline against the labels.
+//!
+//! `import-pack` checks a player's glyph pack into `data/glyphs`.
 
 mod labels;
+mod pack;
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -68,6 +71,18 @@ enum Cmd {
         #[arg(long)]
         verbose: bool,
     },
+    /// Check an unzipped glyph pack and add its good crops to the bundled
+    /// samples.
+    ImportPack {
+        pack: PathBuf,
+        /// Added to every file name, e.g. the issue number "i42".
+        #[arg(long)]
+        tag: String,
+        #[arg(long, default_value = "data/glyphs")]
+        glyphs: PathBuf,
+        #[arg(long, default_value = "data/signatures.json")]
+        signatures: PathBuf,
+    },
 }
 
 fn main() -> Result<()> {
@@ -91,6 +106,20 @@ fn main() -> Result<()> {
             signatures,
             verbose,
         } => eval(&frames, &labels, &templates, &signatures, verbose),
+        Cmd::ImportPack {
+            pack,
+            tag,
+            glyphs,
+            signatures,
+        } => {
+            let db = SignatureDb::from_json(&std::fs::read_to_string(&signatures)?)?;
+            let got = pack::import(&pack, &glyphs, &tag, &db)?;
+            println!("added {} samples to {}", got.added, got.folder.display());
+            for (name, why) in got.rejected {
+                println!("left out {name}: {why}");
+            }
+            Ok(())
+        }
     }
 }
 

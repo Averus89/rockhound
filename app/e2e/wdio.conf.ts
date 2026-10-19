@@ -13,7 +13,8 @@ import { join, resolve } from "node:path";
 const root = resolve(import.meta.dirname, "../..");
 const exe = process.platform === "win32" ? ".exe" : "";
 const fixtures = join(root, "crates/rockhound-core/tests/fixtures");
-const liveCrops = join(root, "data/glyphs/1440p");
+// Alan's 1440p crops (digit lines ~12 px tall).
+const liveCrops = join(root, "data/glyphs/h12");
 
 // Fresh settings, cache and template folders for every run. The config is
 // loaded again in each worker process, which inherits the launcher's folder.

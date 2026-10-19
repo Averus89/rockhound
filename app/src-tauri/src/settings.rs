@@ -17,6 +17,8 @@ pub struct Settings {
     pub overlay: bool,
     /// Save what the scanner sees, for bug reports.
     pub debug: bool,
+    /// Keep read crops as glyph samples the player can send in.
+    pub glyph_samples: bool,
     /// Where the player is, so colliding signatures rank the likely one first.
     pub location: Location,
 }
@@ -28,6 +30,7 @@ impl Default for Settings {
             interval_ms: 250,
             overlay: false,
             debug: false,
+            glyph_samples: false,
             location: Location::Unknown,
         }
     }
@@ -65,6 +68,7 @@ mod tests {
             interval_ms: 100,
             overlay: true,
             debug: true,
+            glyph_samples: true,
             location: Location::Planet,
         };
         s.save(&path).unwrap();
