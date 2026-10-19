@@ -1,0 +1,102 @@
+name: Glyph pack
+
+# Turns a "Glyph pack" issue into a pull request that adds the pack's
+# readout crops to data/glyphs, so the next release reads that HUD size.
+# The issue and its zip come from anyone: the body only reaches the shell
+# through env, the zip is size- and name-checked before unpacking, and
+# import-pack re-checks and re-encodes every image.
+
+on:
+  issues:
+    # Edited: a player who forgot the zip can attach it afterwards.
+    types: [opened, edited]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: glyph-pack-${{ github.event.issue.number }}
+
+jobs:
+  import:
+    if: contains(github.event.issue.labels.*.name, 'glyph-pack')
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ISSUE: ${{ github.event.issue.number }}
+    steps:
+      # The token stays out of .git/config, so build scripts can't read it;
+      # only the push step gets it.
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Download and unpack the pack
+        env:
+          BODY: ${{ github.event.issue.body }}
+        run: |
+          url=$(grep -oE 'https://github\.com/user-attachments/files/[0-9]+/[A-Za-z0-9._-]+\.zip' <<< "$BODY" | head -n 1 || true)
+          if [ -z "$url" ]; then
+            echo "No zip attached. Drag the rockhound-glyphs zip into the issue." > failure.txt
+            exit 1
+          fi
+          curl -fsSL --max-filesize 5000000 -o pack.zip "$url"
+          names=$(unzip -Z1 pack.zip)
+          if [ "$(wc -l <<< "$names")" -gt 300 ] || grep -vqE '^[0-9]+-[0-9]+\.png$' <<< "$names"; then
+            echo "The zip should only hold the PNG files Rockhound saved, named <value>-<n>.png." > failure.txt
+            exit 1
+          fi
+          total=$(unzip -l pack.zip | tail -n 1 | awk '{print $1}')
+          if [ "$total" -gt 20000000 ]; then
+            echo "The zip unpacks to $total bytes; a pack is far smaller." > failure.txt
+            exit 1
+          fi
+          unzip -q -j pack.zip -d "$RUNNER_TEMP/pack"
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Check and add the samples
+        run: |
+          if ! cargo run -q --release -p rockhound-replay -- import-pack "$RUNNER_TEMP/pack" --tag "i$ISSUE" > result.txt 2>&1; then
+            { echo "None of the samples could be used:"; echo; cat result.txt; } > failure.txt
+            exit 1
+          fi
+          cat result.txt
+      # The bundled templates must still read the crops already shipped.
+      - name: Test the recognizer with the new samples
+        run: |
+          if ! cargo test -q --release -p rockhound-core > test.txt 2>&1; then
+            tail -n 30 test.txt
+            echo "The samples made the recognizer worse on existing crops, so a maintainer needs to look at them." > failure.txt
+            exit 1
+          fi
+      - name: Open a pull request
+        run: |
+          branch="glyph-pack/i$ISSUE"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898299+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
+          git add data/glyphs
+          git commit -q -m "Add glyph pack from #$ISSUE"
+          git push -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "$branch"
+          {
+            echo "Samples from #$ISSUE, checked by \`rockhound-replay import-pack\`."
+            echo
+            echo '```'
+            cat result.txt
+            echo '```'
+            echo
+            echo "Look over the images before merging. Closes #$ISSUE."
+          } > body.md
+          if gh pr view "$branch" --json state --jq .state 2>/dev/null | grep -qx OPEN; then
+            gh pr edit "$branch" --body-file body.md
+            gh issue comment "$ISSUE" --body "Updated the pull request with the new zip: $(gh pr view "$branch" --json url --jq .url)"
+          else
+            url=$(gh pr create --head "$branch" --title "Glyph pack from #$ISSUE" --body-file body.md)
+            gh issue comment "$ISSUE" --body "Thanks! Your samples are in a pull request for review: $url"
+          fi
+      - name: Explain what went wrong
+        if: failure()
+        run: |
+          reason=$(cat failure.txt 2>/dev/null || echo "Something went wrong while checking the pack; a maintainer will look at it.")
+          gh issue comment "$ISSUE" --body "$reason"

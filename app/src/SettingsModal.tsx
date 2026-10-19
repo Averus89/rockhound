@@ -19,9 +19,10 @@ interface Props {
   settings: Settings;
   onClose: () => void;
   onSave: (settings: Settings) => Promise<void>;
+  onReviewSamples: () => void;
 }
 
-export function SettingsModal({ opened, settings, onClose, onSave }: Props) {
+export function SettingsModal({ opened, settings, onClose, onSave, onReviewSamples }: Props) {
   const [draft, setDraft] = useState(settings);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
@@ -88,6 +89,15 @@ export function SettingsModal({ opened, settings, onClose, onSave }: Props) {
           checked={draft.debug}
           onChange={(e) => setDraft({ ...draft, debug: e.currentTarget.checked })}
         />
+        <Switch
+          label="Collect digit samples"
+          description="Keeps the small readout crops the scanner reads (never screenshots). Check and send them in so Rockhound learns your screen's HUD size."
+          checked={draft.glyphSamples}
+          onChange={(e) => setDraft({ ...draft, glyphSamples: e.currentTarget.checked })}
+        />
+        <Button variant="default" size="xs" onClick={onReviewSamples}>
+          Review and send samples
+        </Button>
         <NumberInput
           label="Read every (ms)"
           min={50}

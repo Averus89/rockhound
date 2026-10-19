@@ -12,7 +12,7 @@ use std::time::{Duration, Instant};
 use image::{imageops, GrayImage, Luma, RgbaImage};
 use rockhound_core::preprocess::otsu;
 use rockhound_core::{
-    crop_line, hud_format, learn_crop, read_crop, Resolved, SignatureDb, TemplateSet,
+    crop_line, hud_format, learn_crop, line_height, read_crop, Resolved, SignatureDb, TemplateSet,
 };
 
 use crate::debug;
@@ -53,11 +53,39 @@ pub fn teacher_input(crop: &RgbaImage) -> Option<GrayImage> {
     Some(out)
 }
 
+/// Shipped templates come in digit heights (one per HUD size players sent
+/// crops for); the base set is rebuilt around the height on screen.
+struct Heights {
+    /// Shipped heights, and the one the base set is built for.
+    shipped: Vec<u32>,
+    current: Option<u32>,
+    /// Base templates with the given height's samples first.
+    load: fn(Option<u32>) -> TemplateSet,
+}
+
+impl Heights {
+    /// The shipped height for a crop whose digits are `height` px tall,
+    /// when it differs from the current one.
+    fn switch_to(&mut self, height: u32) -> Option<u32> {
+        let nearest = self
+            .shipped
+            .iter()
+            .copied()
+            .min_by_key(|h| (h.abs_diff(height), *h))?;
+        (self.current != Some(nearest)).then(|| {
+            self.current = Some(nearest);
+            nearest
+        })
+    }
+}
+
 pub struct Reader {
     /// Shipped templates followed by the player's learned ones.
     templates: TemplateSet,
     /// How many of `templates` are shipped; only the rest are saved.
     base_len: usize,
+    /// Set when there is more than one shipped height to choose from.
+    heights: Option<Heights>,
     /// Where learned templates are saved; `None` keeps them in memory.
     template_dir: Option<PathBuf>,
     teacher: Option<Box<dyn Teacher>>,
@@ -80,6 +108,7 @@ impl Reader {
         Self {
             templates,
             base_len,
+            heights: None,
             template_dir,
             teacher,
             last_taught: None,
@@ -87,7 +116,48 @@ impl Reader {
         }
     }
 
+    /// A reader on the shipped templates, picking the shipped digit height
+    /// nearest the HUD's once it sees one.
+    pub fn bundled(
+        learned: TemplateSet,
+        template_dir: Option<PathBuf>,
+        teacher: Option<Box<dyn Teacher>>,
+    ) -> Self {
+        let mut reader = Self::new(
+            rockhound_core::bundled_templates(),
+            learned,
+            template_dir,
+            teacher,
+        );
+        let shipped = rockhound_core::bundled_heights();
+        if shipped.len() > 1 {
+            reader.heights = Some(Heights {
+                shipped,
+                current: None,
+                load: rockhound_core::bundled_templates_for,
+            });
+        }
+        reader
+    }
+
+    /// Rebuild the shipped part of the templates when the crop's digit
+    /// height is nearer another shipped height, keeping what was learned.
+    fn follow_height(&mut self, crop: &RgbaImage) {
+        let Some(heights) = self.heights.as_mut() else {
+            return;
+        };
+        let Some(h) = line_height(crop).and_then(|h| heights.switch_to(h)) else {
+            return;
+        };
+        let learned = self.templates.tail(self.base_len);
+        self.templates = (heights.load)(Some(h));
+        self.base_len = self.templates.len();
+        self.templates.extend(learned);
+        debug::note(format_args!("using templates for {h} px digits"));
+    }
+
     pub fn read(&mut self, crop: &RgbaImage, db: &SignatureDb) -> Option<Resolved> {
+        self.follow_height(crop);
         let resolved = read_crop(crop, &self.templates, db).filter(|r| r.value.is_some());
         let learning = !self.templates.missing_digits().is_empty();
         if resolved.is_some() && !learning {
@@ -285,6 +355,51 @@ mod tests {
         assert!(dark > 0 && dark * 3 < input.pixels().len(), "{dark}");
         // Margin rows are blank.
         assert!((0..input.width()).all(|x| input.get_pixel(x, 0).0[0] == 255));
+    }
+
+    #[test]
+    fn rebuilds_the_shipped_templates_for_the_nearest_height() {
+        // Stands in for two shipped heights: one sample per height, so the
+        // set's size says which height it was built for.
+        fn load(height: Option<u32>) -> TemplateSet {
+            let mut set = TemplateSet::default();
+            let crop = fixture("hud_17200.png");
+            for _ in 0..height.unwrap_or(1) / 10 {
+                learn_crop(&crop, 17200, &mut set);
+            }
+            set
+        }
+        let one_line = load(Some(10)).len();
+        // A sample the player's copy learned; it must survive the switches.
+        let mut reader = Reader::new(load(None), load(Some(10)), None, None);
+        reader.heights = Some(Heights {
+            shipped: vec![12, 30],
+            current: None,
+            load,
+        });
+
+        // The fixture's digits are ~12 px tall.
+        let crop = fixture("hud_17200.png");
+        assert_eq!(reader.read(&crop, &db()).and_then(|r| r.value), Some(17200));
+        assert_eq!(reader.heights.as_ref().unwrap().current, Some(12));
+        assert_eq!(reader.base_len, one_line);
+
+        // A bigger HUD switches to the 30 px samples.
+        let big = imageops::resize(
+            &crop,
+            crop.width() * 5 / 2,
+            crop.height() * 5 / 2,
+            imageops::FilterType::Triangle,
+        );
+        reader.read(&big, &db());
+        assert_eq!(reader.heights.as_ref().unwrap().current, Some(30));
+        assert_eq!(reader.base_len, 3 * one_line);
+        assert_eq!(reader.templates.len(), 4 * one_line, "learned samples kept");
+        assert_eq!(
+            reader.heights.as_mut().unwrap().switch_to(31),
+            None,
+            "already there"
+        );
     }
 
     #[test]

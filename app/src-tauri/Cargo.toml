@@ -23,6 +23,8 @@ tauri = { version = "2", features = [] }
 # Without "zip": updates are the plain NSIS installer, not a zipped bundle.
 tauri-plugin-updater = { version = "2", default-features = false, features = ["rustls-tls", "system-proxy"] }
 ureq = "3"
+# Writes glyph packs; stored entries only, so no compression features.
+zip = { version = "9", default-features = false }
 
 [target.'cfg(windows)'.dependencies]
 windows-capture = "2.0.1"

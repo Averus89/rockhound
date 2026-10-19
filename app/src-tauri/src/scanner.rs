@@ -11,6 +11,7 @@ use rockhound_core::{SignatureDb, SignatureMatch, Voter};
 use serde::Serialize;
 
 use crate::reader::Reader;
+use crate::samples;
 
 /// Where readout crops come from.
 pub trait FrameSource: Send {
@@ -122,8 +123,15 @@ pub fn spawn(
             match source.next_crop() {
                 Ok(crop) => {
                     let db = db.read().unwrap_or_else(|e| e.into_inner());
-                    let resolved = crop.and_then(|c| reader.read(&c, &db));
+                    let resolved = crop.as_ref().and_then(|c| reader.read(c, &db));
                     let value = voter.push(resolved.as_ref().and_then(|r| r.value));
+                    // Only frames that agree with the vote, so a misread
+                    // frame isn't offered as a sample of the wrong value.
+                    if let (Some(c), Some(v)) = (&crop, value) {
+                        if resolved.as_ref().and_then(|r| r.value) == Some(v) {
+                            samples::offer(c, v);
+                        }
+                    }
                     if value != shown {
                         shown = value;
                         let matches = value.map(|v| db.matches(v)).unwrap_or_default();

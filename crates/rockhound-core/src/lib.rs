@@ -25,17 +25,48 @@ pub fn crop_line(crop: &image::RgbaImage) -> Option<image::GrayImage> {
     Some(recognize::line_image(&gray, &line))
 }
 
+/// Height in screen pixels of the crop's digit line, or `None` when there is
+/// no line. Glyph samples are grouped by it, since the HUD's digit size
+/// depends on resolution and UI scale, not on resolution alone.
+pub fn line_height(crop: &image::RgbaImage) -> Option<u32> {
+    let gray = preprocess::normalize(crop);
+    layout::find_line(crop, &gray).map(|line| line.height)
+}
+
 mod bundled {
     include!(concat!(env!("OUT_DIR"), "/glyphs.rs"));
 }
 
 /// Templates learned from the labelled crops shipped in `data/glyphs`, so a
-/// known HUD scale reads correctly on first run.
+/// known HUD size reads correctly on first run.
 pub fn bundled_templates() -> TemplateSet {
+    bundled_templates_for(None)
+}
+
+/// Digit heights the shipped crops come in (their `data/glyphs/h<height>`
+/// folders), smallest first.
+pub fn bundled_heights() -> Vec<u32> {
+    let mut heights: Vec<u32> = bundled::GLYPHS.iter().map(|g| g.0).collect();
+    heights.dedup();
+    heights
+}
+
+/// Bundled templates for a HUD whose digit lines are `height` pixels tall.
+///
+/// Crops of the nearest shipped height are learned first, so they fill the
+/// per-character cap; other heights only fill what is left, such as digits
+/// a small pack never showed. Lines are scaled to one height before
+/// matching, so samples from other sizes still help there.
+pub fn bundled_templates_for(height: Option<u32>) -> TemplateSet {
+    let mut glyphs: Vec<_> = bundled::GLYPHS.iter().collect();
+    if let Some(h) = height {
+        // Stable, so each height keeps its file order.
+        glyphs.sort_by_key(|g| (g.0.abs_diff(h), g.0));
+    }
     let mut templates = TemplateSet::default();
-    for (value, png) in bundled::GLYPHS {
-        // The files are checked by the tests below; a bad one only means
-        // fewer samples, never a failed start.
+    for (_, value, png) in glyphs {
+        // The files are checked by the tests; a bad one only means fewer
+        // samples, never a failed start.
         if let Ok(img) = image::load_from_memory(png) {
             learn_crop(&img.to_rgba8(), *value, &mut templates);
         }

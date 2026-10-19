@@ -35,6 +35,7 @@ import {
   type Status,
   stopScan,
 } from "./api";
+import { GlyphPackModal } from "./GlyphPackModal";
 import { History } from "./History";
 import { Readout } from "./Readout";
 import { SettingsModal } from "./SettingsModal";
@@ -48,6 +49,7 @@ export function App() {
   const [history, setHistory] = useState<Reading[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [settingsOpen, settings] = useDisclosure(false);
+  const [samplesOpen, samples] = useDisclosure(false);
   const [update, setUpdate] = useState<AvailableUpdate | null>(null);
 
   const refresh = () =>
@@ -192,8 +194,13 @@ export function App() {
           settings={status.settings}
           onClose={settings.close}
           onSave={save}
+          onReviewSamples={() => {
+            settings.close();
+            samples.open();
+          }}
         />
       )}
+      <GlyphPackModal opened={samplesOpen} onClose={samples.close} />
     </Container>
   );
 }

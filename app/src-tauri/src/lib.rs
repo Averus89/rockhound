@@ -12,6 +12,7 @@ mod fake_game;
 mod ocr;
 mod overlay;
 mod reader;
+mod samples;
 mod scanner;
 mod settings;
 mod sync;
@@ -44,6 +45,8 @@ struct Paths {
     templates: PathBuf,
     /// Diagnostics, when the player turns them on.
     debug: PathBuf,
+    /// Glyph samples, when the player turns them on.
+    samples: PathBuf,
 }
 
 struct AppState {
@@ -125,9 +128,9 @@ fn save_settings(
     settings: Settings,
 ) -> Result<(), String> {
     settings.save(&state.paths.settings)?;
-    // Applied now, not at the next scan start, so switching it off mid-scan
-    // stops the writes.
-    debug::set_dir(settings.debug.then(|| state.paths.debug.clone()));
+    // Applied now, not at the next scan start, so switching them off
+    // mid-scan stops the writes.
+    apply_switches(&settings, &state.paths);
     // The file is written, so memory must match it even if the overlay
     // can't be shown; otherwise a restart would apply different settings.
     let shown = overlay::set_visible(&app, settings.overlay);
@@ -148,7 +151,7 @@ fn start_scan(app: AppHandle, state: State<'_, AppState>) -> Result<(), String> 
     }
     let reader = open_reader(&state.paths.templates)?;
     let settings = lock(&state.settings).clone();
-    debug::set_dir(settings.debug.then(|| state.paths.debug.clone()));
+    apply_switches(&settings, &state.paths);
     if settings.debug {
         debug::note(format_args!("scan started, v{}", env!("CARGO_PKG_VERSION")));
     }
@@ -170,6 +173,51 @@ fn start_scan(app: AppHandle, state: State<'_, AppState>) -> Result<(), String> 
     Ok(())
 }
 
+/// Point the side channels (debug images, glyph samples) at their folders
+/// when the player has them on.
+fn apply_switches(settings: &Settings, paths: &Paths) {
+    debug::set_dir(settings.debug.then(|| paths.debug.clone()));
+    samples::set_dir(settings.glyph_samples.then(|| paths.samples.clone()));
+}
+
+/// Where players send glyph packs: an issue form a workflow turns into a PR.
+#[cfg(windows)]
+const GLYPH_PACK_ISSUE_URL: &str =
+    "https://github.com/Averus89/rockhound/issues/new?template=glyph-pack.yml";
+
+#[tauri::command]
+fn list_glyph_samples(state: State<'_, AppState>) -> Vec<samples::Sample> {
+    samples::list(&state.paths.samples)
+}
+
+#[tauri::command]
+fn delete_glyph_sample(state: State<'_, AppState>, file: String) -> Result<(), String> {
+    samples::remove(&state.paths.samples, &file)
+}
+
+/// Zip the reviewed samples into Downloads, then show the zip and open the
+/// issue form it gets attached to. Returns the zip's path.
+#[tauri::command]
+fn export_glyph_pack(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    samples: Vec<samples::Labelled>,
+) -> Result<String, String> {
+    let out = app.path().download_dir().map_err(|e| e.to_string())?;
+    let zip = samples::export(&state.paths.samples, &samples, &out)?;
+    #[cfg(windows)]
+    {
+        // Best effort: the path is shown in the app either way.
+        let _ = std::process::Command::new("explorer")
+            .arg(format!("/select,{}", zip.display()))
+            .spawn();
+        let _ = std::process::Command::new("explorer")
+            .arg(GLYPH_PACK_ISSUE_URL)
+            .spawn();
+    }
+    Ok(zip.display().to_string())
+}
+
 /// Templates learned so far plus the OCR teacher that adds to them.
 fn open_reader(template_dir: &Path) -> Result<Reader, String> {
     let learned = match TemplateSet::load_dir(template_dir) {
@@ -185,8 +233,7 @@ fn open_reader(template_dir: &Path) -> Result<Reader, String> {
     let teacher: Option<Box<dyn Teacher>> = Some(Box::new(ocr::WindowsOcr::default()));
     #[cfg(not(windows))]
     let teacher: Option<Box<dyn Teacher>> = None;
-    Ok(Reader::new(
-        rockhound_core::bundled_templates(),
+    Ok(Reader::bundled(
         learned,
         Some(template_dir.to_path_buf()),
         teacher,
@@ -264,6 +311,7 @@ pub fn run() {
                 signature_cache: data.join("signatures.json"),
                 templates: data.join("templates"),
                 debug: data.join("debug"),
+                samples: data.join("glyph-samples"),
             };
             let db = sync::load_local(&paths.signature_cache);
             let settings = Settings::load(&paths.settings);
@@ -301,8 +349,11 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            delete_glyph_sample,
+            export_glyph_pack,
             get_status,
             is_installed,
+            list_glyph_samples,
             save_settings,
             start_scan,
             stop_scan

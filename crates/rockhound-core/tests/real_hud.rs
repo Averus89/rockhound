@@ -71,9 +71,10 @@ fn reads_digits_with_strong_colour_fringes() {
     );
 }
 
-/// Labelled live crops shipped in data/glyphs/1440p, as (value, image).
+/// Labelled live crops shipped in data/glyphs/h12 (Alan's 1440p HUD, digit
+/// lines ~12 px tall), as (value, image).
 fn live_crops() -> Vec<(u32, image::RgbaImage)> {
-    let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../data/glyphs/1440p");
+    let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../data/glyphs/h12");
     let mut out: Vec<(String, u32, image::RgbaImage)> = std::fs::read_dir(dir)
         .unwrap()
         .flatten()
@@ -93,12 +94,12 @@ fn bundled_templates_cover_every_digit() {
     assert!(missing.is_empty(), "{missing:?}");
 }
 
-#[test]
-fn reads_unseen_live_crops() {
-    // Leave-one-out over Alan's live 1440p crops: learn from all but one,
-    // read that one. A ratchet: raise the floor as accuracy improves.
+/// Leave-one-out over Alan's live crops: learn from all but one at their
+/// own size, then read that one resized by `scale`. How many read right.
+fn leave_one_out(scale: f32) -> usize {
     let crops = live_crops();
-    let correct = (0..crops.len())
+    let db = db();
+    (0..crops.len())
         .filter(|&i| {
             let mut templates = TemplateSet::default();
             for (j, (value, crop)) in crops.iter().enumerate() {
@@ -107,8 +108,55 @@ fn reads_unseen_live_crops() {
                 }
             }
             let (value, crop) = &crops[i];
-            read_crop(crop, &templates, &db()).and_then(|r| r.value) == Some(*value)
+            let crop = if scale == 1.0 {
+                crop.clone()
+            } else {
+                let size = |px: u32| (px as f32 * scale).round() as u32;
+                image::imageops::resize(
+                    crop,
+                    size(crop.width()),
+                    size(crop.height()),
+                    image::imageops::FilterType::Triangle,
+                )
+            };
+            read_crop(&crop, &templates, &db).and_then(|r| r.value) == Some(*value)
+        })
+        .count()
+}
+
+#[test]
+fn bundled_templates_read_the_shipped_live_crops() {
+    // Guards glyph packs from other HUD sizes: added to the bundled set,
+    // they must not crowd out or outscore the samples these crops need.
+    let templates = rockhound_core::bundled_templates_for(Some(12));
+    let db = db();
+    let crops = live_crops();
+    let correct = crops
+        .iter()
+        .filter(|(value, crop)| {
+            read_crop(crop, &templates, &db).and_then(|r| r.value) == Some(*value)
         })
         .count();
-    assert!(correct >= 40, "{correct}/{} read correctly", crops.len());
+    assert!(correct >= 44, "{correct}/{} read correctly", crops.len());
+}
+
+#[test]
+fn reads_unseen_live_crops() {
+    // A ratchet: raise the floor as accuracy improves.
+    let correct = leave_one_out(1.0);
+    assert!(correct >= 40, "{correct}/46 read correctly");
+}
+
+#[test]
+fn reads_unseen_live_crops_at_other_hud_sizes() {
+    // Resized crops stand in for other resolutions until players send real
+    // ones (a game renders small text more crisply than a resize does).
+    // 1.5x is a 4K HUD, 0.75x a 1080p one.
+    let larger = leave_one_out(1.5);
+    let smaller = leave_one_out(0.75);
+    assert!(larger >= 39, "4K-sized: {larger}/46 read correctly");
+    assert!(
+        smaller >= 35,
+        "1080p-sized: {smaller}/46 read correctly ({larger} 4K-sized)"
+    );
 }

@@ -52,6 +52,16 @@ To make a new key: `npx tauri signer generate -w ~/.tauri/rockhound.key`,
 then put the `.pub` contents in `plugins.updater.pubkey`. A new key strands
 installed copies on their version, so keep the old one safe.
 
+## Helping it read your screen
+
+Rockhound ships digit samples for a 1440p HUD. To help it read yours, turn
+on Settings > "Collect digit samples", scan a few rocks, then open
+"Review and send samples": check the numbers, press Send, and attach the zip
+it saves to the "Glyph pack" issue that opens. Only the small readout crops
+are sent, never screenshots. A workflow checks them with
+`rockhound-replay import-pack` and opens a pull request that adds them to
+`data/glyphs/h<digit height>/`.
+
 ## Running the app
 
 Needs Rust, Node 22 and, on Linux, the WebKitGTK dev packages.

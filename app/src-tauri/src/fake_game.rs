@@ -198,12 +198,7 @@ mod tests {
 
     fn read(source: &mut FakeGame) -> Option<u32> {
         let db = SignatureDb::from_json(include_str!("../../../data/signatures.json")).unwrap();
-        let mut reader = Reader::new(
-            rockhound_core::bundled_templates(),
-            TemplateSet::default(),
-            None,
-            None,
-        );
+        let mut reader = Reader::bundled(TemplateSet::default(), None, None);
         let crop = source.next_crop().unwrap()?;
         reader.read(&crop, &db)?.value
     }
