@@ -217,6 +217,17 @@ fn open_source(
     ))
 }
 
+/// Whether this copy was installed by the setup exe, which can update it in
+/// place. The portable exe can't be replaced by the installer, so it only
+/// hears that a new version is out.
+#[tauri::command]
+fn is_installed() -> bool {
+    std::env::current_exe()
+        .ok()
+        .and_then(|exe| Some(exe.parent()?.join("uninstall.exe").exists()))
+        .unwrap_or(false)
+}
+
 #[tauri::command]
 fn stop_scan(state: State<'_, AppState>) {
     if let Some(handle) = lock(&state.scanner).take() {
@@ -244,6 +255,7 @@ fn spawn_sync(app: AppHandle) {
 
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             let config = app.path().app_config_dir()?;
             let data = app.path().app_data_dir()?;
@@ -290,6 +302,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             get_status,
+            is_installed,
             save_settings,
             start_scan,
             stop_scan

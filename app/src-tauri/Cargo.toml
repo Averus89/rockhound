@@ -20,6 +20,8 @@ rockhound-core = { path = "../../crates/rockhound-core" }
 serde.workspace = true
 serde_json.workspace = true
 tauri = { version = "2", features = [] }
+# Without "zip": updates are the plain NSIS installer, not a zipped bundle.
+tauri-plugin-updater = { version = "2", default-features = false, features = ["rustls-tls", "system-proxy"] }
 ureq = "3"
 
 [target.'cfg(windows)'.dependencies]

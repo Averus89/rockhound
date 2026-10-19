@@ -121,10 +121,21 @@ jobs:
       # Windows-only code (game capture, OCR) is only compiled here.
       - run: cargo clippy -p rockhound-app --all-targets -- -D warnings
       - run: cargo test -p rockhound-app
-      # Builds the frontend, the release exe and the NSIS installer.
+      # Builds the frontend, the release exe and the NSIS installer. With the
+      # updater key (not given to Dependabot or fork PRs) it also signs the
+      # installer, which installed apps check before updating themselves.
       - name: Build app
         working-directory: app
-        run: npx tauri build
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          if [ -n "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+            npx tauri build --config '{"bundle":{"createUpdaterArtifacts":true}}'
+          else
+            npx tauri build
+          fi
       # The game-data extractor, for refreshing data/signatures.json.
       - run: cargo build --release -p rockhound-sigextract
       - uses: actions/upload-artifact@v7
@@ -134,11 +145,14 @@ jobs:
             target/release/rockhound-app.exe
             target/release/sigextract.exe
             target/release/bundle/nsis/*.exe
+            target/release/bundle/nsis/*.exe.sig
           if-no-files-found: error
 
   # Every push to main that passes all jobs and carries a version without a
   # release yet publishes one: the installer, the portable exe, and notes made
   # of that version's DEVLOG entry plus the PRs merged since the last release.
+  # The installer's signature and latest.json go with them; installed apps
+  # read latest.json from the newest release to update themselves.
   # Merges that don't bump the version (Dependabot) release nothing.
   release:
     needs: [check, e2e, audit, windows-build]
@@ -168,7 +182,9 @@ jobs:
           assets=$(gh release view "v$version" --json isDraft,assets \
             --jq 'select(.isDraft | not) | .assets[].name' 2>/dev/null || true)
           if grep -qxF "Rockhound_${version}_x64-setup.exe" <<< "$assets" &&
-             grep -qxF "Rockhound_${version}_portable.exe" <<< "$assets"; then
+             grep -qxF "Rockhound_${version}_x64-setup.exe.sig" <<< "$assets" &&
+             grep -qxF "Rockhound_${version}_portable.exe" <<< "$assets" &&
+             grep -qxF "latest.json" <<< "$assets"; then
             echo "v$version is already released."
           else
             echo "release=true" >> "$GITHUB_OUTPUT"
@@ -186,7 +202,14 @@ jobs:
           node app/scripts/release.mjs notes "$VERSION" > notes.md
           cat notes.md
           cp artifact/rockhound-app.exe "Rockhound_${VERSION}_portable.exe"
-          files=("artifact/bundle/nsis/Rockhound_${VERSION}_x64-setup.exe" "Rockhound_${VERSION}_portable.exe")
+          setup="artifact/bundle/nsis/Rockhound_${VERSION}_x64-setup.exe"
+          if [ ! -f "$setup.sig" ]; then
+            echo "::error::The installer is unsigned. Add the TAURI_SIGNING_PRIVATE_KEY and TAURI_SIGNING_PRIVATE_KEY_PASSWORD repository secrets."
+            exit 1
+          fi
+          node app/scripts/release.mjs latest "$VERSION" "$GH_REPO" "$setup.sig" > latest.json
+          cat latest.json
+          files=("$setup" "$setup.sig" "Rockhound_${VERSION}_portable.exe" latest.json)
           # A release left without its files, or as a draft, by a failed
           # upload or publish gets them now and is published.
           if gh release view "v$VERSION" > /dev/null 2>&1; then

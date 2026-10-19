@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { check } from "@tauri-apps/plugin-updater";
 
 export type Category = "ship_mining" | "ground_deposit" | "salvage";
 
@@ -52,3 +53,19 @@ export const onScannerStopped = (cb: (error: string | null) => void): Promise<Un
   listen<string | null>("scanner-stopped", (e) => cb(e.payload));
 export const onSignaturesUpdated = (cb: (version: string) => void): Promise<UnlistenFn> =>
   listen<string>("signatures-updated", (e) => cb(e.payload));
+
+/** A newer Rockhound release than the running one. */
+export interface AvailableUpdate {
+  version: string;
+  /** Installed copies update in place; the portable exe can't. */
+  installed: boolean;
+  /** Downloads, verifies and runs the installer, which closes the app. */
+  install: () => Promise<void>;
+}
+
+/** The newest release when it is newer than this copy, otherwise null. */
+export async function checkForUpdate(): Promise<AvailableUpdate | null> {
+  const [update, installed] = await Promise.all([check(), invoke<boolean>("is_installed")]);
+  if (!update) return null;
+  return { version: update.version, installed, install: () => update.downloadAndInstall() };
+}

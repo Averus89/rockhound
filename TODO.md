@@ -16,7 +16,9 @@
 ## Milestone 3: Tauri shell
 - [x] Tauri v2 + React + Mantine main window (simplified UI)
 - [x] Signature table sync (fetch, validate, cache, bundled fallback)
-- [ ] Sync only works once the repo (or the data file) is publicly readable
+- [x] Sync works now the repo is public
+- [x] App updates itself from GitHub Releases (Tauri updater, signed installer)
+- [x] Updater key and pubkey set up (Alan)
 - [ ] Ship templates with the app instead of the app data folder
 - [x] `sigextract`: refresh signatures.json from Data.p4k after a patch
 - [x] First real run of `sigextract` (SC 4.7 LIVE): table confirmed
