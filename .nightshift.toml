@@ -1,0 +1,8 @@
+# nightshift: issues in this repo wake agents (Averus89/nightshift). Changing this file is always a one-way door.
+enabled = true
+done = "pr"                      # agents stop at a PR; Alan merges
+owners = ["Averus89"]            # only their /answer, /sign, /stop, /retry count
+strangers = "pr"
+check = "sh scripts/check.sh"    # the Rust and frontend steps of .github/workflows/ci.yml that need no Tauri system libs
+deploy = ""
+live_url = ""

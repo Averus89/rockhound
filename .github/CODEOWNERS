@@ -1,0 +1,13 @@
+# One-way doors: changes here need an owner's approving review (with branch protection,
+# "Require review from Code Owners"). Changing this file is itself one-way.
+.github/                 @Averus89
+.nightshift.toml         @Averus89
+docs/decisions/          @Averus89
+# Dependencies and lock files
+app/package.json         @Averus89
+app/package-lock.json    @Averus89
+Cargo.toml               @Averus89
+Cargo.lock               @Averus89
+# Release and update config (a version bump on main publishes a release)
+app/scripts/release.mjs  @Averus89
+app/src-tauri/tauri.conf.json @Averus89
