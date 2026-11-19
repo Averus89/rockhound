@@ -1,0 +1,27 @@
+name: Cleanup
+description: Something old that must go, but cannot go yet
+labels: [cleanup]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What to remove
+      description: The code, flag, fallback, data, document or check, with paths. Link the PR that left it behind.
+    validations: { required: true }
+  - type: textarea
+    id: why-not-now
+    attributes:
+      label: Why not now
+      description: What still depends on it.
+  - type: textarea
+    id: ready-when
+    attributes:
+      label: Ready when
+      description: The condition that makes the removal safe, e.g. "no rows left in old_jobs" or "flag at 100% for 14 days".
+    validations: { required: true }
+  - type: textarea
+    id: verify
+    attributes:
+      label: How to verify
+      description: A command, query or metric anyone can run to see whether the condition holds. If none exists, say what to measure first.
+    validations: { required: true }

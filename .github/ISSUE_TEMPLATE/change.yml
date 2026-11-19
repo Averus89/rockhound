@@ -1,0 +1,29 @@
+name: Change
+description: A feature, a change in behaviour, or a cleanup
+body:
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Outcome
+      description: What should be different for whom when this is done. Describe the result, not the code.
+    validations: { required: true }
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
+      description: The problem behind it, and how you handle it today.
+  - type: textarea
+    id: done
+    attributes:
+      label: How we will know it works
+      description: A check, a request and its answer, a number that should move.
+  - type: input
+    id: recheck
+    attributes:
+      label: Look again after release
+      description: Optional. The signal that shows it still works in use, and when to measure it again, e.g. "returning users, 30 days after release".
+  - type: textarea
+    id: limits
+    attributes:
+      label: Out of scope
+      description: What this must not change.

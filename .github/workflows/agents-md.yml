@@ -1,0 +1,14 @@
+name: agents-md
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  length:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: AGENTS.md has at most 20 lines
+        run: |
+          n=$(wc -l < AGENTS.md)
+          echo "AGENTS.md: $n lines"
+          [ "$n" -le 20 ] || { echo "::error file=AGENTS.md::AGENTS.md has $n lines; keep it at 20 or fewer and move details to linked docs"; exit 1; }

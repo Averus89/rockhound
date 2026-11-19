@@ -1,0 +1,19 @@
+# One-way doors: changes here need an owner's approving review (with branch protection,
+# "Require review from Code Owners"). Changing this file is itself one-way.
+.github/                         @Averus89
+docs/decisions/                  @Averus89
+# Licence and security terms
+LICENSE                          @Averus89
+CONTRIBUTING.md                  @Averus89
+SECURITY.md                      @Averus89
+# Dependencies and lock files
+Cargo.toml                       @Averus89
+Cargo.lock                       @Averus89
+app/package.json                 @Averus89
+app/package-lock.json            @Averus89
+# Release, updater key and app permissions
+app/scripts/release.mjs          @Averus89
+app/src-tauri/tauri.conf.json    @Averus89
+app/src-tauri/capabilities/      @Averus89
+# The check contract
+scripts/check.sh                 @Averus89
