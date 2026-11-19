@@ -74,7 +74,7 @@ jobs:
   # Drives the built app through WebDriver with a recorded game standing in
   # for Star Citizen, as a player would: start, read, stop, settings.
   e2e:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # ubuntu-latest moved to 26.04, where webkit2gtk-driver is renamed webkitgtk-webdriver
     steps:
       - uses: actions/checkout@v7
         with:
