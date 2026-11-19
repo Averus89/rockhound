@@ -192,7 +192,11 @@ fn apply_zip64_extra(entry: &mut Entry, mut extra: &[u8]) {
         let id = u16_at(extra, 0);
         let len = usize::from(u16_at(extra, 2)).min(extra.len() - 4);
         if id == 0x0001 {
-            let mut fields = extra[4..4 + len].chunks_exact(8).map(|c| u64_at(c, 0));
+            let mut fields = extra[4..4 + len]
+                .as_chunks::<8>()
+                .0
+                .iter()
+                .map(|c| u64::from_le_bytes(*c));
             for value in [
                 &mut entry.size,
                 &mut entry.compressed_size,
