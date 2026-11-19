@@ -1,6 +1,7 @@
 # One-way doors: changes here need an owner's approving review (with branch protection,
 # "Require review from Code Owners"). Changing this file is itself one-way.
 .github/                         @Averus89
+.nightshift.toml                 @Averus89
 docs/decisions/                  @Averus89
 # Licence and security terms
 LICENSE                          @Averus89
