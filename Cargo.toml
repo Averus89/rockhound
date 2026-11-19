@@ -5,7 +5,7 @@ members = ["crates/rockhound-core", "crates/rockhound-replay", "crates/rockhound
 [workspace.package]
 version = "0.9.0"
 edition = "2021"
-rust-version = "1.87"
+rust-version = "1.90"
 license = "PolyForm-Noncommercial-1.0.0"
 authors = ["Alan (Averus89)"]
 repository = "https://github.com/Averus89/rockhound"

@@ -68,7 +68,7 @@ are sent, never screenshots. A workflow checks them with
 
 ## Running the app
 
-Needs Rust 1.87 or newer (the `rust-version` in `Cargo.toml`), Node 22 and,
+Needs Rust 1.90 or newer (the `rust-version` in `Cargo.toml`), Node 22 and,
 on Linux, the WebKitGTK dev packages.
 
 ```sh
