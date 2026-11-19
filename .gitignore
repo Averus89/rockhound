@@ -6,3 +6,4 @@ dist/
 *.mkv
 /replay/
 /app/src-tauri/gen/
+.claude/skills

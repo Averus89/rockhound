@@ -1,0 +1,36 @@
+name: Friction
+description: The repo or its tools got in the way of the work (filed by agents and people)
+labels: [friction]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What got in the way, and how you worked around it.
+    validations: { required: true }
+  - type: textarea
+    id: wanted
+    attributes:
+      label: What you wanted
+      description: What you were trying to do when it happened.
+    validations: { required: true }
+  - type: textarea
+    id: repro
+    attributes:
+      label: How to reproduce
+      description: The command, request or steps. Exact error text helps more than a summary.
+  - type: textarea
+    id: cost
+    attributes:
+      label: What it cost
+      description: Time, retries, tokens, an approval. How often it happens.
+  - type: textarea
+    id: investigation
+    attributes:
+      label: First investigation
+      description: What you think the cause is, and a fix you would recommend. Say what you did not check.
+  - type: textarea
+    id: files
+    attributes:
+      label: Files
+      description: Paths that matter.

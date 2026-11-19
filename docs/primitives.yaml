@@ -1,0 +1,51 @@
+# The repo's primitives: the few building blocks the system is made of.
+# Agents compose existing ones before inventing new ones, and update this file in the same PR as the code.
+# Entry: name, group, what (one sentence), code (entry point), docs.
+
+- name: readout-pipeline
+  group: recognition
+  what: turns a crop of the HUD readout into glyph reads and a validated signature value (cleanup, line layout, template matching, voting)
+  code: crates/rockhound-core/src/lib.rs
+  docs: docs/decisions/0002-template-matching-not-ocr.md
+
+- name: signature-table
+  group: data
+  what: the table of signature values the game can show; the only source of values a read may resolve to
+  code: crates/rockhound-core/src/signatures.rs
+  docs: README.md
+
+- name: glyph-templates
+  group: data
+  what: digit crops grouped by digit height, bundled into the core and learned from live reads or player packs
+  code: data/glyphs/
+  docs: DEVLOG.md
+
+- name: replay-tool
+  group: tools
+  what: CLI that extracts frames, learns templates, evaluates the pipeline on reference videos and imports glyph packs
+  code: crates/rockhound-replay/src/main.rs
+  docs: README.md
+
+- name: sigextract
+  group: tools
+  what: CLI that refreshes data/signatures.json from the game's Data.p4k after a patch
+  code: crates/rockhound-sigextract/src/main.rs
+  docs: crates/rockhound-sigextract/README.md
+
+- name: desktop-app
+  group: surfaces
+  what: Tauri shell (live capture, scanner loop, settings, overlay, updater) with a React main window
+  code: app/src-tauri/src/lib.rs
+  docs: README.md
+
+- name: release-pipeline
+  group: delivery
+  what: a version bump plus a DEVLOG entry becomes a signed installer, release notes and latest.json for in-app updates
+  code: app/scripts/release.mjs
+  docs: README.md
+
+- name: website
+  group: surfaces
+  what: static page published to GitHub Pages, with its own inline copy of the signature table
+  code: site/index.html
+  docs: site/README.md

@@ -1,0 +1,30 @@
+name: Bug
+description: Something does not work as it should
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, what you got instead.
+    validations: { required: true }
+  - type: textarea
+    id: repro
+    attributes:
+      label: How to reproduce
+      description: Steps, a request, or a link. Exact error text helps more than a summary.
+  - type: input
+    id: where
+    attributes:
+      label: Where
+      description: Version, commit, URL or environment.
+  - type: input
+    id: before
+    attributes:
+      label: Seen before
+      description: An earlier issue or PR with the same symptom, if you know one. A problem that comes back needs its cause fixed, not the same patch again.
+  - type: input
+    id: source
+    attributes:
+      label: Source
+      description: Where the report came from and its id there (support ticket, error tracker, feedback form), so the reporter can get a reply.
