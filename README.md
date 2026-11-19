@@ -68,7 +68,8 @@ are sent, never screenshots. A workflow checks them with
 
 ## Running the app
 
-Needs Rust, Node 22 and, on Linux, the WebKitGTK dev packages.
+Needs Rust 1.87 or newer (the `rust-version` in `Cargo.toml`), Node 22 and,
+on Linux, the WebKitGTK dev packages.
 
 ```sh
 cd app
