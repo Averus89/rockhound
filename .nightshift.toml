@@ -1,0 +1,8 @@
+# nightshift (github.com/Averus89/nightshift): issues in this repo wake agents. Changing this file is always a one-way door.
+enabled = true
+done = "pr"                      # agents stop at a PR; the owner merges
+owners = ["Averus89"]            # only their /answer, /sign, /stop, /retry count
+strangers = "pr"                 # public repo: anyone's issue ends at a PR the owner reviews
+check = "sh scripts/check.sh"    # the same script CI runs (AGENTS.md)
+deploy = ""
+live_url = ""
