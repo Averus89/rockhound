@@ -32,7 +32,7 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
       - name: Install Tauri system libraries
@@ -68,7 +68,7 @@ jobs:
   e2e:
     runs-on: ubuntu-24.04  # ubuntu-latest moved to 26.04, where webkit2gtk-driver is renamed webkitgtk-webdriver
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
       - name: Install Tauri, WebDriver and video libraries
@@ -92,7 +92,7 @@ jobs:
   audit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
       - uses: taiki-e/install-action@v2
@@ -110,7 +110,7 @@ jobs:
   windows-build:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
       - uses: actions/setup-node@v7
@@ -180,7 +180,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
       - name: Decide whether to release
@@ -198,7 +198,7 @@ jobs:
           else
             echo "release=true" >> "$GITHUB_OUTPUT"
           fi
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         if: steps.version.outputs.release
         with:
           name: rockhound-windows
