@@ -1,15 +1,28 @@
-# Weekly dependency update PRs; security fixes arrive as soon as advisories do.
+# Weekly dependency updates, one grouped PR per ecosystem (at most three a week).
+# Security fixes still arrive as their own PRs as soon as advisories do.
 version: 2
 updates:
   - package-ecosystem: cargo
     directory: /
     schedule:
       interval: weekly
+    groups:
+      cargo:
+        applies-to: version-updates
+        patterns: ["*"]
   - package-ecosystem: npm
     directory: /app
     schedule:
       interval: weekly
+    groups:
+      npm:
+        applies-to: version-updates
+        patterns: ["*"]
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    groups:
+      github-actions:
+        applies-to: version-updates
+        patterns: ["*"]
