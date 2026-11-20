@@ -4,13 +4,13 @@ Fast Star Citizen signature scanner. Reads the signature value from the HUD
 while you fly and tells you what's out there (which ore, how many rocks,
 salvage), with a main window and an in-game overlay.
 
-Rewritten from scratch in Rust with a Tauri + React (Mantine) UI. Instead of a general
+Built in Rust with a Tauri + React (Mantine) UI. Instead of a general
 OCR engine it matches the fixed HUD digit font against stored templates, so a
 read takes a few milliseconds and the app stays small.
 
 ## Status
 
-Early. What exists now:
+Early in development. Components:
 
 - `crates/rockhound-core`: readout pipeline (cleanup, glyph split, template
   matching, signature table lookup, frame voting).
