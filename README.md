@@ -4,13 +4,13 @@ Fast Star Citizen signature scanner. Reads the signature value from the HUD
 while you fly and tells you what's out there (which ore, how many rocks,
 salvage), with a main window and an in-game overlay.
 
-Rewritten from scratch in Rust with a Tauri + React (Mantine) UI. Instead of a general
+Built in Rust with a Tauri + React (Mantine) UI. Instead of a general
 OCR engine it matches the fixed HUD digit font against stored templates, so a
 read takes a few milliseconds and the app stays small.
 
 ## Status
 
-Early. What exists now:
+Early in development. Components:
 
 - `crates/rockhound-core`: readout pipeline (cleanup, glyph split, template
   matching, signature table lookup, frame voting).
@@ -21,7 +21,8 @@ Early. What exists now:
 - `app/`: Tauri desktop app. Main window with the current reading, its best
   match and recent reads; settings for the readout box and read interval.
   Live capture of the game window on Windows, and an overlay.
-- `data/signatures.json`: signature table (SC 4.7). The app checks this repo
+- `data/signatures.json`: signature table; its `sc_version` field names the
+  game version it was extracted from. The app checks this repo
   for a newer copy at startup, caches it, and falls back to the bundled one.
   A patch only needs a data commit.
 
@@ -87,7 +88,7 @@ starting it:
 - a folder of full-window PNG screenshots, played in name order.
 
 Both loop, and go through the same search band and pin locator as live
-capture. `ROCKHOUND_REPLAY_DIR` still plays a folder of readout crops made by
+capture. `ROCKHOUND_REPLAY_DIR` plays a folder of readout crops made by
 the replay tool, skipping the locator.
 
 ## Automated tests
@@ -104,10 +105,9 @@ uses [WebdriverIO](https://webdriver.io) with
 [tauri-driver](https://v2.tauri.app/develop/tests/webdriver/) to click
 through the main window like a player: Start, see 17,200 and then 21,500
 with their matches, Stop, change a setting. A second spec plays live crops
-of the values that have misread before (3,370, 14,000, 16,960, 17,080,
+of the values the reader finds hard (3,370, 14,000, 16,960, 17,080,
 25,620 and the mixed cluster 25,680) and checks each one is shown. Specs live
-in `app/e2e/`. CI runs
-them on Linux under a virtual display on every push.
+in `app/e2e/`. CI runs them on Linux under a virtual display on every push.
 
 It needs `tauri-driver` (`cargo install tauri-driver --locked`) and ffmpeg.
 On Linux also `webkit2gtk-driver` and a display (`xvfb-run -a npm run e2e` on
