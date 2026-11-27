@@ -29,7 +29,7 @@ jobs:
     steps:
       # The token stays out of .git/config, so build scripts can't read it;
       # only the push step gets it.
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
       - name: Download and unpack the pack
