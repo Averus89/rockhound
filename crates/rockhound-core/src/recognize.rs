@@ -642,10 +642,19 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn template_names() {
-        assert_eq!(parse_template_name("6_a.png"), Some('6'));
-        assert_eq!(parse_template_name("comma_3.png"), Some(','));
-        assert_eq!(parse_template_name("x_a.png"), None);
-        assert_eq!(parse_template_name("66.png"), None);
+    fn loading_templates_reports_invalid_filenames() {
+        let dir = std::env::temp_dir().join(format!("rockhound-bad-tpl-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        // Valid digit and comma filenames are covered by save_and_load_round_trip.
+        for name in ["x_a.png", "66.png"] {
+            let path = dir.join(name);
+            GrayImage::new(3, LINE_HEIGHT).save(&path).unwrap();
+            assert!(
+                matches!(TemplateSet::load_dir(&dir), Err(TemplateError::Name(n)) if n == name),
+                "invalid template filename: {name}"
+            );
+            std::fs::remove_file(path).unwrap();
+        }
+        std::fs::remove_dir_all(dir).unwrap();
     }
 }
